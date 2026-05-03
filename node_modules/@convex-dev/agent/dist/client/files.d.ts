@@ -1,0 +1,69 @@
+import type { FilePart, ImagePart, ModelMessage } from "ai";
+import type { Id } from "../component/_generated/dataModel.js";
+import type { ActionCtx, AgentComponent, MutationCtx, QueryCtx } from "./types.js";
+import type { Message } from "../validators.js";
+import type { StorageReader } from "convex/server";
+export declare const MAX_FILE_SIZE: number;
+type File = {
+    url: string;
+    fileId: string;
+    storageId: Id<"_storage">;
+    hash: string;
+    filename: string | undefined;
+};
+/**
+ * Store a file in the file storage and return the URL and fileId.
+ * @param ctx A ctx object from an action.
+ * @param component The agent component.
+ * @param blob The blob to store.
+ * @param args.filename The filename to store.
+ * @param args.sha256 The sha256 hash of the file. If not provided, it will be
+ *   computed. However, to ensure no corruption during transfer, you can
+ *   calculate this on the client to enforce integrity.
+ * @returns The URL, fileId, and storageId of the stored file.
+ */
+export declare function storeFile(ctx: ActionCtx | MutationCtx, component: AgentComponent, blob: Blob, { filename, sha256 }?: {
+    filename?: string;
+    sha256?: string;
+}): Promise<{
+    file: File;
+    filePart: FilePart;
+    imagePart: ImagePart | undefined;
+}>;
+/**
+ * Get file metadata from the component.
+ * This also returns filePart (and imagePart if the file is an image),
+ * which are useful to construct a ModelMessage like
+ * ```ts
+ * const { filePart, imagePart } = await getFile(ctx, components.agent, fileId);
+ * const message: UserMessage = {
+ *   role: "user",
+ *   content: [imagePart ?? filePart],
+ * };
+ * ```
+ * @param ctx A ctx object from an action or query.
+ * @param component The agent component, usually `components.agent`.
+ * @param fileId The fileId of the file to get.
+ * @returns The file metadata and content parts.
+ */
+export declare function getFile(ctx: ActionCtx | (QueryCtx & {
+    storage: StorageReader;
+}), component: AgentComponent, fileId: string): Promise<{
+    file: {
+        fileId: string;
+        url: string;
+        storageId: Id<"_storage">;
+        hash: string;
+        filename: string | undefined;
+    };
+    filePart: FilePart;
+    imagePart: ImagePart | undefined;
+}>;
+/**
+ * Process messages to inline file and image URLs that point to localhost
+ * by converting them to base64. This solves the problem of LLMs not being
+ * able to access localhost URLs.
+ */
+export declare function inlineMessagesFiles<T extends ModelMessage | Message>(messages: T[]): Promise<T[]>;
+export {};
+//# sourceMappingURL=files.d.ts.map

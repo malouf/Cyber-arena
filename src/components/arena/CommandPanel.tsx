@@ -1,11 +1,11 @@
-import type { Soul, Ability } from '../../game/types'
-import type { ActiveCommand } from './gameReducer'
+import type { Ability, Soul } from '../../game/types'
+import type { ActiveCommand } from './gameStore'
 
 type Props = {
   activeCommand: ActiveCommand
   setActiveCommand: (cmd: ActiveCommand) => void
   simStats: { pm: number; pa: number; mana: number }
-  equippedAbilities: Ability[]
+  equippedAbilities: Array<Ability>
   pSoul: Soul
   cooldowns: Record<string, number>
   disabled?: boolean
