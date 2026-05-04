@@ -1,0 +1,1 @@
+{"version":3,"file":"defaultComponent.d.ts","sourceRoot":"","sources":["../../src/client/defaultComponent.ts"],"names":[],"mappings":"AACA,OAAO,KAAK,EAAE,cAAc,EAAE,MAAM,YAAY,CAAC;AAEjD,MAAM,MAAM,eAAe,GAAG;IAC5B;;;OAGG;IACH,SAAS,CAAC,EAAE,cAAc,CAAC;CAC5B,CAAC;AAEF,wBAAgB,YAAY,CAAC,IAAI,CAAC,EAAE,eAAe,GAAG,cAAc,CAEnE;AAED,eAAO,MAAM,gBAAgB,EACN,cAAc,CAAC"}

@@ -1,0 +1,1 @@
+{"version":3,"file":"SmoothText.js","sourceRoot":"","sources":["../../src/react/SmoothText.tsx"],"names":[],"mappings":"AAAA,OAAO,EAAE,aAAa,EAA0B,MAAM,oBAAoB,CAAC;AAE3E,MAAM,UAAU,UAAU,CAAC,EACzB,IAAI,EACJ,GAAG,OAAO,EAC2B;IACrC,MAAM,CAAC,WAAW,CAAC,GAAG,aAAa,CAAC,IAAI,EAAE,OAAO,CAAC,CAAC;IACnD,OAAO,WAAW,CAAC;AACrB,CAAC"}

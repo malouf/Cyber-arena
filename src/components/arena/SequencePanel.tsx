@@ -1,23 +1,36 @@
-import type { Action } from '../../game/types'
-import type { ArenaPhase } from './gameReducer'
+import { useGameStore } from './gameStore'
 
-type Props = {
-  actionQueue: Action[]
-  onClearQueue: () => void
-  isResolving: boolean
-  resolveTurn: () => void
-  logs: string[]
-  phase: ArenaPhase
-}
+export function SequencePanel() {
+  const actionQueue = useGameStore((s) => s.server.actionQueue)
+  const logs = useGameStore((s) => s.ui.logs)
+  const phase = useGameStore((s) => s.ui.phase)
+  const isResolving = useGameStore((s) => s.isResolving())
+  const clearQueue = useGameStore((s) => s.clearQueue)
+  const runTurnResolution = useGameStore((s) => s.runTurnResolution)
 
-export function SequencePanel({
-  actionQueue,
-  onClearQueue,
-  isResolving,
-  resolveTurn,
-  logs,
-  phase,
-}: Props) {
+  const player = useGameStore((s) => s.server.player)
+  const enemy = useGameStore((s) => s.server.enemy)
+  const cooldowns = useGameStore((s) => s.server.cooldowns)
+  const usesThisTurn = useGameStore((s) => s.server.usesThisTurn)
+  const persistentBuffs = useGameStore((s) => s.server.persistentBuffs)
+
+  const resolveTurn = async () => {
+    if (phase !== 'planning') return
+    if (actionQueue.length === 0) return
+
+    await runTurnResolution(
+      player,
+      enemy,
+      [...actionQueue],
+      {
+        cooldowns: { ...cooldowns },
+        usesThisTurn: { ...usesThisTurn },
+        flowStateRange: persistentBuffs.flowStateRange,
+        bonusPa: persistentBuffs.bonusPa,
+      },
+    )
+  }
+
   const commitLabel =
     phase === 'resolving' ? 'Resolving...' : phase === 'playback' ? 'Playback...' : 'Commit Sequence'
 
@@ -30,7 +43,7 @@ export function SequencePanel({
           </h3>
           <button
             disabled={isResolving}
-            onClick={onClearQueue}
+            onClick={clearQueue}
             className="text-[9px] font-bold text-neutral-600 hover:text-red-600 uppercase transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Clear All

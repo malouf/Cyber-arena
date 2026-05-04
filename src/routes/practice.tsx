@@ -1,9 +1,10 @@
+/* eslint-disable import/consistent-type-specifier-style */
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import { DraftPhase, type PlayerBuild } from '../components/arena/DraftPhase'
 import { ArenaView } from '../components/arena/ArenaView'
-import type { ArenaPhase } from '../components/arena/gameReducer'
+import type { ArenaPhase } from '../components/arena/gameStore'
 
 type PracticePhase = 'drafting' | ArenaPhase
 

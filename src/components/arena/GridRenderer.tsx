@@ -1,34 +1,30 @@
-import type { Ability, Action } from '../../game/types'
 import { obstacles } from '../../game/data'
-
-type Pos = { x: number, y: number }
+import { useGameStore } from './gameStore'
 
 type Props = {
-  unitPos: Pos
-  enemyPos: Pos
-  actionQueue: Action[]
-  activeCommand: { type: 'move' } | { type: 'ability', ability: Ability } | null
-  simStats: { pm: number }
-  selectedPassives: string[]
-  flowStateRange: number
-  hoveredCell: Pos | null
-  setHoveredCell: (pos: Pos | null) => void
-  onCellClick: (pos: Pos) => void
-  visualEffects: Array<{ id: number, x: number, y: number, text: string, color: string }>
-  isResolving: boolean
+  buildPassives: Array<string>
 }
 
-export function GridRenderer({
-  unitPos, enemyPos, actionQueue, activeCommand, simStats,
-  selectedPassives, flowStateRange, hoveredCell, setHoveredCell, onCellClick,
-  visualEffects, isResolving
-}: Props) {
+export function GridRenderer({ buildPassives }: Props) {
+  const playerPos = useGameStore((s) => s.server.player.pos)
+  const enemyPos = useGameStore((s) => s.server.enemy.pos)
+  const actionQueue = useGameStore((s) => s.server.actionQueue)
+  const activeCommand = useGameStore((s) => s.ui.activeCommand)
+  const simStats = useGameStore((s) => s.getSimulatedResources())
+  const flowStateRange = useGameStore((s) => s.server.persistentBuffs.flowStateRange)
+  const hoveredCell = useGameStore((s) => s.ui.hoveredCell)
+  const visualEffects = useGameStore((s) => s.ui.visualEffects)
+  const isResolving = useGameStore((s) => s.isResolving())
+
+  const setHoveredCell = useGameStore((s) => s.setHoveredCell)
+  const handleCellClick = useGameStore((s) => s.handleCellClick)
+
   const gridSize = 16
   const visionRange = 6
   const rows = Array.from({ length: gridSize }, (_, i) => i)
   const cols = Array.from({ length: gridSize }, (_, i) => i)
 
-  const getDistance = (c1: Pos, c2: Pos) => {
+  const getDistance = (c1: { x: number; y: number }, c2: { x: number; y: number }) => {
     const dx = c2.x - c1.x
     const dy = c2.y - c1.y
     return Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dx + dy))
@@ -45,16 +41,23 @@ export function GridRenderer({
           >
             {cols.map((x) => {
               const cell = { x, y }
-              const isUnit = unitPos.x === x && unitPos.y === y
+              const isUnit = playerPos.x === x && playerPos.y === y
               const isEnemyRaw = enemyPos.x === x && enemyPos.y === y
               const isWall = obstacles.some(o => o.x === x && o.y === y)
-              const distFromPlayer = getDistance(unitPos, cell)
+              const distFromPlayer = getDistance(playerPos, cell)
               const isVisible = distFromPlayer <= visionRange
               
               const isEnemy = isEnemyRaw && isVisible
               
               // Active Command Range Highlighting
-              const lastPos = actionQueue.reduce((pos, action) => action.type === 'move' ? action.target : (action.type === 'ability' && action.ability?.type === 'move_attack' ? action.target : pos), unitPos)
+              const lastPos = actionQueue.reduce((pos, action) => {
+                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+                if (action.type === 'move') return action.target
+                const ability = action.ability
+                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+                if (action.type === 'ability' && ability && ability.type === 'move_attack') return action.target
+                return pos
+              }, playerPos)
               const distance = getDistance(lastPos, cell)
               
               let inValidRange = false
@@ -62,13 +65,13 @@ export function GridRenderer({
                 inValidRange = distance > 0 && distance <= simStats.pm && !isWall
               } else if (activeCommand?.type === 'ability') {
                 let effectiveRange = activeCommand.ability.range
-                if (selectedPassives.includes('flow_state') && flowStateRange > 0) {
+                if (buildPassives.includes('flow_state') && flowStateRange > 0) {
                   effectiveRange += flowStateRange
                 }
                 inValidRange = distance <= effectiveRange && (!isWall || activeCommand.ability.type === 'buff')
               }
 
-              const isHoveredValid = hoveredCell?.x === x && hoveredCell?.y === y && inValidRange
+              const isHoveredValid = hoveredCell && hoveredCell.x === x && hoveredCell.y === y && inValidRange
 
               // Shape logic: CSS polygon for hexagon
               const hexStyle = {
@@ -80,7 +83,7 @@ export function GridRenderer({
               return (
                 <div 
                   key={`${x}-${y}`}
-                  onClick={() => onCellClick(cell)}
+                  onClick={() => handleCellClick(cell, buildPassives)}
                   onMouseEnter={() => setHoveredCell(cell)}
                   onMouseLeave={() => setHoveredCell(null)}
                   style={hexStyle}
