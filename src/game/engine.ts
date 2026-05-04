@@ -1,47 +1,28 @@
 import { obstacles } from "./data";
-import type { Ability, Action } from "./types";
-
-export type Pos = { x: number; y: number };
-
-export type EntityState = {
-  id: "player" | "enemy";
-  hp: number;
-  maxHp: number;
-  pa: number;
-  maxPa: number;
-  pm: number;
-  maxPm: number;
-  mana: number;
-  maxMana: number;
-  pos: Pos;
-  passives: Array<string>;
-};
-
-export type CombatEvent =
-  | { type: "log"; text: string }
-  | { type: "effect"; text: string; color: string; pos: Pos }
-  | { type: "move"; entity: "player" | "enemy"; pos: Pos }
-  | {
-      type: "stats";
-      entity: "player" | "enemy";
-      hp?: number;
-      pa?: number;
-      pm?: number;
-      mana?: number;
-    }
-  | { type: "delay"; ms: number };
-
-export type TurnState = {
-  cooldowns: Record<string, number>;
-  usesThisTurn: Record<string, number>;
-  flowStateRange: number;
-  bonusPa: number;
-};
+import type {
+  Ability,
+  Action,
+  CombatEvent,
+  EntityState,
+  Pos,
+  TurnState,
+} from "./types";
 
 function getDistance(c1: Pos, c2: Pos) {
   const dx = c2.x - c1.x;
   const dy = c2.y - c1.y;
   return Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dx + dy));
+}
+
+function getNeighbors(pos: Pos): Array<Pos> {
+  return [
+    { x: pos.x + 1, y: pos.y },
+    { x: pos.x - 1, y: pos.y },
+    { x: pos.x, y: pos.y + 1 },
+    { x: pos.x, y: pos.y - 1 },
+    { x: pos.x + 1, y: pos.y - 1 },
+    { x: pos.x - 1, y: pos.y + 1 },
+  ];
 }
 
 export function resolveTurn(
@@ -53,7 +34,7 @@ export function resolveTurn(
   const events: Array<CombatEvent> = [];
 
   // Clone state for simulation
-  const pStats = { ...pState };
+  const pStats = { ...pState, pa: pState.pa + turnState.bonusPa };
   const eStats = { ...eState };
   let pPos = { ...pState.pos };
   let ePos = { ...eState.pos };
@@ -69,44 +50,46 @@ export function resolveTurn(
   // --- AI LOGIC ---
   const eQueue: Array<Action> = [];
   if (eStats.hp > 0) {
-    const dist = getDistance(ePos, pPos);
-    if (dist > 1) {
-      const dx = pPos.x > ePos.x ? 1 : pPos.x < ePos.x ? -1 : 0;
-      const dy = pPos.y > ePos.y ? 1 : pPos.y < ePos.y ? -1 : 0;
-      const newEnemyPos = { x: ePos.x + dx, y: ePos.y + dy };
-      const isAIWall = obstacles.some(
-        (o) => o.x === newEnemyPos.x && o.y === newEnemyPos.y,
-      );
-      if ((newEnemyPos.x !== pPos.x || newEnemyPos.y !== pPos.y) && !isAIWall) {
+    let currentEPos = { ...ePos };
+    for (let step = 0; step < eStats.pm; step++) {
+      const dist = getDistance(currentEPos, pPos);
+      if (dist <= 1) break;
+
+      const neighbors = getNeighbors(currentEPos);
+      let bestNeighbor = null;
+      let minDist = dist;
+
+      for (const neighbor of neighbors) {
+        const isWall = obstacles.some(
+          (o) => o.x === neighbor.x && o.y === neighbor.y,
+        );
+        const isPlayer = neighbor.x === pPos.x && neighbor.y === pPos.y;
+        if (isWall || isPlayer) continue;
+
+        const d = getDistance(neighbor, pPos);
+        if (d < minDist) {
+          minDist = d;
+          bestNeighbor = neighbor;
+        }
+      }
+
+      if (bestNeighbor) {
+        currentEPos = bestNeighbor;
         eQueue.push({
           type: "move",
-          target: newEnemyPos,
-          initiative: 100,
+          target: currentEPos,
+          initiative: 100 - step,
           name: "Move",
           paCost: 0,
           pmCost: 1,
           manaCost: 0,
         });
+      } else {
+        break;
       }
-      if (getDistance(newEnemyPos, pPos) <= 1) {
-        eQueue.push({
-          type: "ability",
-          target: pPos,
-          name: "Basic Attack",
-          initiative: 50,
-          paCost: 0,
-          pmCost: 0,
-          manaCost: 0,
-          ability: {
-            id: "bot_attack",
-            name: "Basic Attack",
-            damage: 15,
-            range: 1,
-            type: "attack",
-          } as Ability,
-        });
-      }
-    } else {
+    }
+
+    if (getDistance(currentEPos, pPos) <= 1) {
       eQueue.push({
         type: "ability",
         target: pPos,
@@ -145,7 +128,7 @@ export function resolveTurn(
       events.push({ type: "stats", entity: "player", hp: pStats.hp });
 
       if (pStats.passives.includes("masochism") && finalDamage > 0) {
-        nextBonusPa = 1;
+        nextBonusPa += 1;
       }
       if (pStats.passives.includes("thorns") && isMelee) {
         eStats.hp -= 5;
@@ -193,6 +176,8 @@ export function resolveTurn(
       events.push({ type: "delay", ms: 900 });
 
       const isPlayer = action.entity === "player";
+      const myPos = isPlayer ? pPos : ePos;
+      const hisPos = isPlayer ? ePos : pPos;
       const targetPos = isPlayer ? ePos : pPos;
 
       if (action.type === "move") {
@@ -255,6 +240,90 @@ export function resolveTurn(
           effectiveRange += turnState.flowStateRange;
         }
 
+        // --- SPECIAL ABILITIES ---
+        if (ability.id === "whirlwind") {
+          const dist = getDistance(myPos, hisPos);
+          if (dist <= 1) {
+            applyDamage(isPlayer ? "enemy" : "player", dmg, true);
+            events.push({
+              type: "log",
+              text: `> ${ability.name} hits for ${dmg} DMG.`,
+            });
+          } else {
+            events.push({
+              type: "log",
+              text: `> ${ability.name} hits nothing.`,
+            });
+          }
+          continue;
+        }
+
+        if (ability.id === "taunt") {
+          const dist = getDistance(myPos, hisPos);
+          if (dist <= effectiveRange && dist > 1) {
+            const neighbors = getNeighbors(hisPos);
+            let bestNeighbor = hisPos;
+            let minDist = dist;
+            for (const n of neighbors) {
+              const d = getDistance(n, myPos);
+              if (d < minDist) {
+                const isWall = obstacles.some(
+                  (o) => o.x === n.x && o.y === n.y,
+                );
+                const isMe = n.x === myPos.x && n.y === myPos.y;
+                if (!isWall && !isMe) {
+                  minDist = d;
+                  bestNeighbor = n;
+                }
+              }
+            }
+            if (bestNeighbor.x !== hisPos.x || bestNeighbor.y !== hisPos.y) {
+              if (isPlayer) {
+                ePos = bestNeighbor;
+                events.push({
+                  type: "move",
+                  entity: "enemy",
+                  pos: { ...ePos },
+                });
+              } else {
+                pPos = bestNeighbor;
+                events.push({
+                  type: "move",
+                  entity: "player",
+                  pos: { ...pPos },
+                });
+              }
+              events.push({
+                type: "log",
+                text: `> Magnetic Pull pulls target closer!`,
+              });
+            }
+          } else {
+            events.push({
+              type: "log",
+              text: `> Magnetic Pull FAILED or already adjacent.`,
+            });
+          }
+          continue;
+        }
+
+        if (ability.id === "resonance") {
+          if (currentDist <= effectiveRange) {
+            const bonusDmg = cellsMovedThisTurn * 5;
+            const finalResonanceDmg = dmg + bonusDmg;
+            applyDamage(
+              isPlayer ? "enemy" : "player",
+              finalResonanceDmg,
+              false,
+            );
+            events.push({
+              type: "log",
+              text: `> Resonance hits for ${finalResonanceDmg} DMG! (+${bonusDmg} from movement)`,
+            });
+          }
+          continue;
+        }
+
         if (ability.id === "impulse" && isPlayer) {
           if (
             currentDist <= effectiveRange &&
@@ -289,27 +358,34 @@ export function resolveTurn(
         }
 
         if (ability.type === "move_attack") {
+          cellsMovedThisTurn += getDistance(myPos, action.target);
           if (isPlayer) {
-            cellsMovedThisTurn += getDistance(pPos, action.target);
             pPos = action.target;
             events.push({ type: "move", entity: "player", pos: { ...pPos } });
+          } else {
+            ePos = action.target;
+            events.push({ type: "move", entity: "enemy", pos: { ...ePos } });
+          }
+          events.push({
+            type: "log",
+            text: `> ${ability.name} leaps to [${action.target.x}, ${action.target.y}]!`,
+          });
+
+          const newDist = getDistance(
+            isPlayer ? pPos : ePos,
+            isPlayer ? ePos : pPos,
+          );
+          if (newDist <= 1) {
+            applyDamage(isPlayer ? "enemy" : "player", dmg, true);
             events.push({
               type: "log",
-              text: `> ${ability.name} leaps to [${pPos.x}, ${pPos.y}]!`,
+              text: `> ${ability.name} hits for ${dmg} DMG.`,
             });
-
-            if (getDistance(pPos, ePos) <= 1) {
-              applyDamage("enemy", dmg, true);
-              events.push({
-                type: "log",
-                text: `> ${ability.name} hits Enemy for ${dmg} DMG.`,
-              });
-            } else {
-              events.push({
-                type: "log",
-                text: `> No adjacent targets for ${ability.name}.`,
-              });
-            }
+          } else {
+            events.push({
+              type: "log",
+              text: `> No adjacent targets for ${ability.name}.`,
+            });
           }
         } else {
           if (currentDist <= effectiveRange) {

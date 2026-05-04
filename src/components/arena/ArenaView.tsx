@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useShallow } from "zustand/shallow";
 import { soulData } from "../../game/data";
 
 import { ArenaHeader } from "./ArenaHeader";
@@ -6,9 +7,15 @@ import { GridRenderer } from "./GridRenderer";
 import { CommandPanel } from "./CommandPanel";
 import { SequencePanel } from "./SequencePanel";
 import { useGameStore } from "./gameStore";
+import {
+  getSimulatedResources,
+  selectActiveCommand,
+  selectEnemy,
+  selectPhase,
+  selectPlayer,
+} from "./selectors";
 import type { PlayerBuild } from "./DraftPhase";
-import type { EntityState } from "../../game/engine";
-import type { Ability } from "../../game/types";
+import type { Ability, EntityState } from "../../game/types";
 
 type Props = {
   build: PlayerBuild;
@@ -20,15 +27,14 @@ export function ArenaView({ build, onAbort, onPhaseChange }: Props) {
   const pSoul = soulData[build.primary];
   const sSoul = soulData[build.secondary];
 
-  const player = useGameStore((s) => s.server.player);
-  const enemy = useGameStore((s) => s.server.enemy);
+  const player = useGameStore(useShallow(selectPlayer));
+  const enemy = useGameStore(useShallow(selectEnemy));
   const cooldowns = useGameStore((s) => s.server.cooldowns);
-  const phase = useGameStore((s) => s.ui.phase);
-  const activeCommand = useGameStore((s) => s.ui.activeCommand);
+  const phase = useGameStore(selectPhase);
+  const activeCommand = useGameStore(selectActiveCommand);
 
   const setActiveCommand = useGameStore((s) => s.setActiveCommand);
-  const getSimulatedResources = useGameStore((s) => s.getSimulatedResources);
-  const isResolvingFn = useGameStore((s) => s.isResolving);
+  const simStats = useGameStore(useShallow(getSimulatedResources));
   const initializeGame = useGameStore((s) => s.initializeGame);
 
   useEffect(() => {
@@ -72,8 +78,7 @@ export function ArenaView({ build, onAbort, onPhaseChange }: Props) {
     onPhaseChange?.(phase);
   }, [phase, onPhaseChange]);
 
-  const simStats = getSimulatedResources();
-  const isResolving = isResolvingFn();
+  const isResolving = phase !== "planning";
 
   const handleSetActiveCommand = (
     command: { type: "move" } | { type: "ability"; ability: Ability } | null,

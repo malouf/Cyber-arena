@@ -1,82 +1,34 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import { obstacles } from "../../game/data";
-import type { Ability, Action } from "../../game/types";
-import type { CombatEvent, EntityState, TurnState } from "../../game/engine";
+import {
+  getDistance,
+  getLastQueuedPos,
+  getSimulatedResources,
+  isCellOccupiedByEnemy,
+  isCellWall,
+} from "./selectors";
+import type {
+  Action,
+  CombatEvent,
+  EntityState,
+  TurnState,
+} from "../../game/types";
+import type { ActiveCommand, GameState } from "./types";
 
-export type ArenaPhase = "planning" | "resolving" | "playback";
-
-export type ActiveCommand =
-  | { type: "move" }
-  | { type: "ability"; ability: Ability }
-  | null;
-
-export type VisualEffect = {
-  id: number;
-  x: number;
-  y: number;
-  text: string;
-  color: string;
-};
-
-export type GameServerState = {
-  player: EntityState;
-  enemy: EntityState;
-  actionQueue: Array<Action>;
-  cooldowns: Record<string, number>;
-  usesThisTurn: Record<string, number>;
-  persistentBuffs: {
-    flowStateRange: number;
-    bonusPa: number;
-  };
-};
-
-export type GameUiState = {
-  phase: ArenaPhase;
-  activeCommand: ActiveCommand;
-  hoveredCell: { x: number; y: number } | null;
-  logs: Array<string>;
-  visualEffects: Array<VisualEffect>;
-};
-
-export type GameState = {
-  server: GameServerState;
-  ui: GameUiState;
-};
-
-export type SimulatedResources = {
-  pa: number;
-  pm: number;
-  mana: number;
-};
-
-type GameStore = {
-  // Readonly state accessors
-  server: GameServerState;
-  ui: GameUiState;
-
-  // Initialization
+type GameStore = GameState & {
   initializeGame: (
     player: EntityState,
     enemy: EntityState,
     initialLogs?: Array<string>,
   ) => void;
-
-  // UI actions
   setActiveCommand: (command: ActiveCommand) => void;
   setHoveredCell: (cell: { x: number; y: number } | null) => void;
-
-  // Cell interaction
   handleCellClick: (
     cell: { x: number; y: number },
     buildPassives: Array<string>,
   ) => void;
-
-  // Queue actions
   queueAction: (action: Action) => void;
   clearQueue: () => void;
-
-  // Turn resolution
   startTurnResolution: () => void;
   applyEvent: (
     event: Exclude<CombatEvent, { type: "delay" }>,
@@ -84,27 +36,12 @@ type GameStore = {
   ) => void;
   removeEffect: (effectId: number) => void;
   finishTurn: (nextTurnState: TurnState) => void;
-
-  // Turn resolution runner (manages async effects)
   runTurnResolution: (
     player: EntityState,
     enemy: EntityState,
     queue: Array<Action>,
     turnState: TurnState,
   ) => Promise<void>;
-
-  // Derived state helpers
-  getSimulatedResources: () => SimulatedResources;
-  isResolving: () => boolean;
-};
-
-const getDistance = (
-  c1: { x: number; y: number },
-  c2: { x: number; y: number },
-) => {
-  const dx = c2.x - c1.x;
-  const dy = c2.y - c1.y;
-  return Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dx + dy));
 };
 
 export const useGameStore = create<GameStore>()(
@@ -150,7 +87,6 @@ export const useGameStore = create<GameStore>()(
       visualEffects: [],
     },
 
-    // Initialization
     initializeGame: (player, enemy, initialLogs) =>
       set((state) => {
         state.server.player = player;
@@ -168,7 +104,6 @@ export const useGameStore = create<GameStore>()(
         ];
       }),
 
-    // UI actions
     setActiveCommand: (command) =>
       set((state) => {
         state.ui.activeCommand = command;
@@ -179,7 +114,6 @@ export const useGameStore = create<GameStore>()(
         state.ui.hoveredCell = cell;
       }),
 
-    // Cell interaction
     handleCellClick: (cell, buildPassives) =>
       set((state) => {
         const { ui, server } = state;
@@ -187,37 +121,12 @@ export const useGameStore = create<GameStore>()(
         if (ui.phase !== "planning") return;
         if (!ui.activeCommand) return;
 
-        const lastPos = server.actionQueue.reduce(
-          (pos: { x: number; y: number }, action: Action) => {
-            if (action.type === "move") return action.target;
-            const ability = action.ability;
-
-            if (ability && ability.type === "move_attack") return action.target;
-            return pos;
-          },
-          server.player.pos,
-        );
-
+        const lastPos = getLastQueuedPos(state);
         const dist = getDistance(lastPos, cell);
-        const isOccupiedByEnemy =
-          cell.x === server.enemy.pos.x && cell.y === server.enemy.pos.y;
-        const isWall = obstacles.some(
-          (obstacle) => obstacle.x === cell.x && obstacle.y === cell.y,
-        );
+        const isOccupiedByEnemy = isCellOccupiedByEnemy(state, cell);
+        const isWall = isCellWall(cell);
 
-        // Calculate simulated resources
-        const simStats = server.actionQueue.reduce(
-          (acc: SimulatedResources, action: Action) => ({
-            pa: acc.pa - action.paCost,
-            pm: acc.pm - action.pmCost,
-            mana: acc.mana - action.manaCost,
-          }),
-          {
-            pa: server.player.pa + server.persistentBuffs.bonusPa,
-            pm: server.player.pm,
-            mana: server.player.mana,
-          },
-        );
+        const simStats = getSimulatedResources(state);
 
         if (ui.activeCommand.type === "move") {
           if (
@@ -320,7 +229,6 @@ export const useGameStore = create<GameStore>()(
         state.ui.activeCommand = null;
       }),
 
-    // Queue actions
     queueAction: (action) =>
       set((state) => {
         state.server.actionQueue.push(action);
@@ -333,7 +241,6 @@ export const useGameStore = create<GameStore>()(
         state.ui.activeCommand = null;
       }),
 
-    // Turn resolution
     startTurnResolution: () =>
       set((state) => {
         state.ui.phase = "resolving";
@@ -375,8 +282,6 @@ export const useGameStore = create<GameStore>()(
           return;
         }
 
-        // Handle 'stats' event
-
         const entity = event.entity;
         if (entity === "player") {
           if (event.hp !== undefined) state.server.player.hp = event.hp;
@@ -412,7 +317,6 @@ export const useGameStore = create<GameStore>()(
         state.ui.activeCommand = null;
       }),
 
-    // Turn resolution runner
     runTurnResolution: async (player, enemy, queue, turnState) => {
       const { startTurnResolution, applyEvent, removeEffect, finishTurn } =
         get();
@@ -421,7 +325,6 @@ export const useGameStore = create<GameStore>()(
 
       startTurnResolution();
 
-      // Import dynamically to avoid circular deps
       const { resolveTurn } = await import("../../game/engine");
 
       const { events, nextTurnState } = resolveTurn(
@@ -449,37 +352,5 @@ export const useGameStore = create<GameStore>()(
 
       finishTurn(nextTurnState);
     },
-
-    // Derived helpers
-    getSimulatedResources: () => {
-      const { server } = get();
-      return server.actionQueue.reduce(
-        (acc, action) => ({
-          pa: acc.pa - action.paCost,
-          pm: acc.pm - action.pmCost,
-          mana: acc.mana - action.manaCost,
-        }),
-        {
-          pa: server.player.pa + server.persistentBuffs.bonusPa,
-          pm: server.player.pm,
-          mana: server.player.mana,
-        },
-      );
-    },
-
-    isResolving: () => {
-      return get().ui.phase !== "planning";
-    },
   })),
 );
-
-// Selector helpers for common access patterns
-export const selectServer = (state: GameStore) => state.server;
-export const selectUi = (state: GameStore) => state.ui;
-export const selectPlayer = (state: GameStore) => state.server.player;
-export const selectEnemy = (state: GameStore) => state.server.enemy;
-export const selectActionQueue = (state: GameStore) => state.server.actionQueue;
-export const selectPhase = (state: GameStore) => state.ui.phase;
-export const selectActiveCommand = (state: GameStore) => state.ui.activeCommand;
-export const selectLogs = (state: GameStore) => state.ui.logs;
-export const selectVisualEffects = (state: GameStore) => state.ui.visualEffects;
