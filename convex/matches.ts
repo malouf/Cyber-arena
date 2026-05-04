@@ -497,7 +497,7 @@ export const joinAsReplacement = mutation({
     slotToReplace: v.string(),
   },
   returns: v.object({
-    success: v.literal(true),
+    success: v.boolean(),
   }),
   handler: async (ctx: any, args: any) => {
     const match = await ctx.db.get("matches", args.matchId);
