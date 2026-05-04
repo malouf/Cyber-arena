@@ -31,15 +31,3 @@ export type Soul = {
   actives: Array<Ability>;
   passives: Array<Passive>;
 };
-
-export type Action = {
-  type: "move" | "ability";
-  target: { x: number; y: number };
-  ability?: Ability;
-  paCost: number;
-  pmCost: number;
-  manaCost: number;
-  name: string;
-  initiative: number;
-  entity?: "player" | "enemy";
-};

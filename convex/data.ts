@@ -258,7 +258,6 @@ export const soulData: Record<SoulId, Soul> = {
   },
 };
 
-// Static obstacles for practice arena
 export const obstacles = [
   { x: 5, y: 4 },
   { x: 5, y: 5 },

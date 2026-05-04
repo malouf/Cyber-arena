@@ -1,21 +1,21 @@
-import fs from 'fs'
+import fs from "fs";
 
-let code = fs.readFileSync('src/routes/practice.tsx', 'utf8')
+let code = fs.readFileSync("src/routes/practice.tsx", "utf8");
 
 // Add imports for the new engine
 code = code.replace(
   `import { soulData, obstacles } from '../game/data'`,
-  `import { soulData, obstacles } from '../game/data'\nimport { resolveTurn as engineResolveTurn, EntityState, TurnState, CombatEvent } from '../game/engine'`
-)
+  `import { soulData, obstacles } from '../game/data'\nimport { resolveTurn as engineResolveTurn, EntityState, TurnState, CombatEvent } from '../game/engine'`,
+);
 
 // The old resolveTurn is:
-const resolveTurnOldStart = `  const resolveTurn = async () => {`
-const handleSelectPrimaryStart = `  const handleSelectPrimary = (id: SoulId) => {`
+const resolveTurnOldStart = `  const resolveTurn = async () => {`;
+const handleSelectPrimaryStart = `  const handleSelectPrimary = (id: SoulId) => {`;
 
 const oldResolveStr = code.substring(
   code.indexOf(resolveTurnOldStart),
-  code.indexOf(handleSelectPrimaryStart)
-)
+  code.indexOf(handleSelectPrimaryStart),
+);
 
 const resolveTurnNew = `  const resolveTurn = async () => {
     if (isResolving) return
@@ -95,9 +95,9 @@ const resolveTurnNew = `  const resolveTurn = async () => {
     setIsResolving(false)
   }
 
-`
+`;
 
-code = code.replace(oldResolveStr, resolveTurnNew)
+code = code.replace(oldResolveStr, resolveTurnNew);
 
-fs.writeFileSync('src/routes/practice.tsx', code)
-console.log('practice.tsx updated for engine integration!')
+fs.writeFileSync("src/routes/practice.tsx", code);
+console.log("practice.tsx updated for engine integration!");
