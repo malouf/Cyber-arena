@@ -1,60 +1,69 @@
-import type { Action, Ability } from '../../game/types'
-import type { CombatEvent, EntityState, Pos, TurnState } from '../../game/engine'
+import type { Ability, Action } from "../../game/types";
+import type {
+  CombatEvent,
+  EntityState,
+  Pos,
+  TurnState,
+} from "../../game/engine";
 
-export type ArenaPhase = 'planning' | 'resolving' | 'playback'
+export type ArenaPhase = "planning" | "resolving" | "playback";
 
 export type ActiveCommand =
-  | { type: 'move' }
-  | { type: 'ability'; ability: Ability }
-  | null
+  | { type: "move" }
+  | { type: "ability"; ability: Ability }
+  | null;
 
 export type VisualEffect = {
-  id: number
-  x: number
-  y: number
-  text: string
-  color: string
-}
+  id: number;
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+};
 
 export type GameServerState = {
-  player: EntityState
-  enemy: EntityState
-  actionQueue: Action[]
-  cooldowns: Record<string, number>
-  usesThisTurn: Record<string, number>
+  player: EntityState;
+  enemy: EntityState;
+  actionQueue: Array<Action>;
+  cooldowns: Record<string, number>;
+  usesThisTurn: Record<string, number>;
   persistentBuffs: {
-    flowStateRange: number
-    bonusPa: number
-  }
-}
+    flowStateRange: number;
+    bonusPa: number;
+  };
+};
 
 export type GameUiState = {
-  phase: ArenaPhase
-  activeCommand: ActiveCommand
-  hoveredCell: Pos | null
-  logs: string[]
-  visualEffects: VisualEffect[]
-}
+  phase: ArenaPhase;
+  activeCommand: ActiveCommand;
+  hoveredCell: Pos | null;
+  logs: Array<string>;
+  visualEffects: Array<VisualEffect>;
+};
 
 export type GameState = {
-  server: GameServerState
-  ui: GameUiState
-}
+  server: GameServerState;
+  ui: GameUiState;
+};
 
 type GameAction =
-  | { type: 'setActiveCommand'; command: ActiveCommand }
-  | { type: 'setHoveredCell'; cell: Pos | null }
-  | { type: 'queueAction'; action: Action }
-  | { type: 'clearQueue' }
-  | { type: 'startTurnResolution' }
-  | { type: 'applyEvent'; event: Exclude<CombatEvent, { type: 'delay' }>; effectId?: number }
-  | { type: 'removeEffect'; effectId: number }
-  | { type: 'finishTurn'; nextTurnState: TurnState }
+  | { type: "setActiveCommand"; command: ActiveCommand }
+  | { type: "setHoveredCell"; cell: Pos | null }
+  | { type: "queueAction"; action: Action }
+  | { type: "clearQueue" }
+  | { type: "startTurnResolution" }
+  | {
+      type: "applyEvent";
+      event: Exclude<CombatEvent, { type: "delay" }>;
+      effectId?: number;
+    }
+  | { type: "removeEffect"; effectId: number }
+  | { type: "finishTurn"; nextTurnState: TurnState };
 
 export function createInitialGameState(args: {
-  player: EntityState
-  enemy: EntityState
-  initialLogs?: string[]
+  player: EntityState;
+  enemy: EntityState;
+  initialLogs?: Array<string>;
 }): GameState {
   return {
     server: {
@@ -66,13 +75,15 @@ export function createInitialGameState(args: {
       persistentBuffs: { flowStateRange: 0, bonusPa: 0 },
     },
     ui: {
-      phase: 'planning',
+      phase: "planning",
       activeCommand: null,
       hoveredCell: null,
-      logs: args.initialLogs ?? ['System online. Select a command to begin sequence.'],
+      logs: args.initialLogs ?? [
+        "System online. Select a command to begin sequence.",
+      ],
       visualEffects: [],
     },
-  }
+  };
 }
 
 export function getSimulatedResources(serverState: GameServerState) {
@@ -87,32 +98,32 @@ export function getSimulatedResources(serverState: GameServerState) {
       pm: serverState.player.pm,
       mana: serverState.player.mana,
     },
-  )
+  );
 }
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
-    case 'setActiveCommand': {
+    case "setActiveCommand": {
       return {
         ...state,
         ui: {
           ...state.ui,
           activeCommand: action.command,
         },
-      }
+      };
     }
 
-    case 'setHoveredCell': {
+    case "setHoveredCell": {
       return {
         ...state,
         ui: {
           ...state.ui,
           hoveredCell: action.cell,
         },
-      }
+      };
     }
 
-    case 'queueAction': {
+    case "queueAction": {
       return {
         ...state,
         server: {
@@ -123,10 +134,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           ...state.ui,
           activeCommand: null,
         },
-      }
+      };
     }
 
-    case 'clearQueue': {
+    case "clearQueue": {
       return {
         ...state,
         server: {
@@ -137,26 +148,27 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           ...state.ui,
           activeCommand: null,
         },
-      }
+      };
     }
 
-    case 'startTurnResolution': {
+    case "startTurnResolution": {
       return {
         ...state,
         ui: {
           ...state.ui,
-          phase: 'resolving',
+          phase: "resolving",
           activeCommand: null,
           hoveredCell: null,
         },
-      }
+      };
     }
 
-    case 'applyEvent': {
-      const event = action.event
-      const nextUiPhase = state.ui.phase === 'resolving' ? 'playback' : state.ui.phase
+    case "applyEvent": {
+      const event = action.event;
+      const nextUiPhase =
+        state.ui.phase === "resolving" ? "playback" : state.ui.phase;
 
-      if (event.type === 'log') {
+      if (event.type === "log") {
         return {
           ...state,
           ui: {
@@ -164,12 +176,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             phase: nextUiPhase,
             logs: [event.text, ...state.ui.logs].slice(0, 15),
           },
-        }
+        };
       }
 
-      if (event.type === 'effect') {
+      if (event.type === "effect") {
         if (action.effectId === undefined) {
-          return state
+          return state;
         }
         return {
           ...state,
@@ -187,11 +199,11 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
               },
             ],
           },
-        }
+        };
       }
 
-      if (event.type === 'move') {
-        if (event.entity === 'player') {
+      if (event.type === "move") {
+        if (event.entity === "player") {
           return {
             ...state,
             server: {
@@ -205,7 +217,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
               ...state.ui,
               phase: nextUiPhase,
             },
-          }
+          };
         }
 
         return {
@@ -221,63 +233,61 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             ...state.ui,
             phase: nextUiPhase,
           },
-        }
+        };
       }
 
-      if (event.type === 'stats') {
-        if (event.entity === 'player') {
-          return {
-            ...state,
-            server: {
-              ...state.server,
-              player: {
-                ...state.server.player,
-                hp: event.hp ?? state.server.player.hp,
-                pa: event.pa ?? state.server.player.pa,
-                pm: event.pm ?? state.server.player.pm,
-                mana: event.mana ?? state.server.player.mana,
-              },
-            },
-            ui: {
-              ...state.ui,
-              phase: nextUiPhase,
-            },
-          }
-        }
-
+      if (event.entity === "player") {
         return {
           ...state,
           server: {
             ...state.server,
-            enemy: {
-              ...state.server.enemy,
-              hp: event.hp ?? state.server.enemy.hp,
-              pa: event.pa ?? state.server.enemy.pa,
-              pm: event.pm ?? state.server.enemy.pm,
-              mana: event.mana ?? state.server.enemy.mana,
+            player: {
+              ...state.server.player,
+              hp: event.hp ?? state.server.player.hp,
+              pa: event.pa ?? state.server.player.pa,
+              pm: event.pm ?? state.server.player.pm,
+              mana: event.mana ?? state.server.player.mana,
             },
           },
           ui: {
             ...state.ui,
             phase: nextUiPhase,
           },
-        }
+        };
       }
 
-      return state
+      return {
+        ...state,
+        server: {
+          ...state.server,
+          enemy: {
+            ...state.server.enemy,
+            hp: event.hp ?? state.server.enemy.hp,
+            pa: event.pa ?? state.server.enemy.pa,
+            pm: event.pm ?? state.server.enemy.pm,
+            mana: event.mana ?? state.server.enemy.mana,
+          },
+        },
+        ui: {
+          ...state.ui,
+          phase: nextUiPhase,
+        },
+      };
     }
 
-    case 'removeEffect': {
+    case "removeEffect": {
       return {
         ...state,
         ui: {
           ...state.ui,
-          visualEffects: state.ui.visualEffects.filter((effect) => effect.id !== action.effectId),
+          visualEffects: state.ui.visualEffects.filter(
+            (effect) => effect.id !== action.effectId,
+          ),
         },
-      }
+      };
     }
 
-    case 'finishTurn': {
+    case "finishTurn": {
       return {
         server: {
           ...state.server,
@@ -291,14 +301,14 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         },
         ui: {
           ...state.ui,
-          phase: 'planning',
+          phase: "planning",
           activeCommand: null,
         },
-      }
+      };
     }
 
     default: {
-      return state
+      return state;
     }
   }
 }

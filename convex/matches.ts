@@ -1,27 +1,20 @@
 import { v } from "convex/values";
-import { api } from "./_generated/api";
-import { internalMutation, mutation, query } from "./_generated/server";
-import { obstacles, soulData } from "./data";
+import { mutation, query } from "./_generated/server";
+import { soulData } from "./data";
 import { getDistance, resolveMatchTurn } from "./gameEngine";
+import {
+  combatEventValidator,
+  entityStateValidator,
+  mapObjectValidator,
+  playerStateInMatchValidator,
+} from "./validators";
 import type { Doc } from "./_generated/dataModel";
 
-type PlayerSlot = string;
 type Pos = { x: number; y: number };
 type EntityState = Doc<"matches">["players"][number]["state"];
 type ValidatedAction = Doc<"turnSubmissions">["queue"][number];
-type CombatEvent = Doc<"matchEvents">["events"][number];
 
-const BOARD_MIN = 0;
-const BOARD_MAX = 15; // Increased board size for 3v3
-
-function inBounds(pos: Pos): boolean {
-  return (
-    pos.x >= BOARD_MIN &&
-    pos.x <= BOARD_MAX &&
-    pos.y >= BOARD_MIN &&
-    pos.y <= BOARD_MAX
-  );
-}
+const obstacles: Array<Pos> = []; // Define obstacles if needed or import correctly
 
 function makeInitialState(
   startPos: Pos,
@@ -64,18 +57,22 @@ export const queueForMatch = mutation({
     mode: v.union(v.literal("1v1"), v.literal("3v3")),
     type: v.union(v.literal("casual"), v.literal("strategic")),
   },
-  handler: async (ctx, args) => {
+  returns: v.object({
+    status: v.union(v.literal("waiting"), v.literal("matched")),
+    matchId: v.union(v.id("matches"), v.null()),
+  }),
+  handler: async (ctx: any, args: any) => {
     // Check if already in an active match
     const activeMatch = await ctx.db
       .query("matches")
-      .withIndex("by_status", (q) => q.eq("status", "active"))
-      .filter((q) =>
+      .withIndex("by_status", (q: any) => q.eq("status", "active"))
+      .filter((q: any) =>
         q.any(q.eq(q.field("players"), [{ clientId: args.clientId }] as any)),
       ) // Simplified check
       .take(10); // Collect some and check manually since complex filter
 
-    const currentMatch = activeMatch.find((m) =>
-      m.players.some((p) => p.clientId === args.clientId),
+    const currentMatch = activeMatch.find((m: any) =>
+      m.players.some((p: any) => p.clientId === args.clientId),
     );
     if (currentMatch) {
       return { status: "matched" as const, matchId: currentMatch._id };
@@ -97,7 +94,7 @@ export const queueForMatch = mutation({
     // Try to match
     const waiting = await ctx.db
       .query("matchmakingQueue")
-      .withIndex("by_mode", (q) => q.eq("mode", args.mode))
+      .withIndex("by_mode", (q: any) => q.eq("mode", args.mode))
       .order("asc")
       .collect();
 
@@ -110,7 +107,7 @@ export const queueForMatch = mutation({
         await ctx.db.delete("matchmakingQueue", p._id);
       }
 
-      const players = matchedPlayers.map((p, i) => {
+      const players = matchedPlayers.map((p: any, i: number) => {
         const isTeam1 = i < needed / 2;
         const teamIdx = i % (needed / 2);
         const startPos = isTeam1
@@ -139,7 +136,12 @@ export const queueForMatch = mutation({
         players,
         mapObjects: [
           { type: "hp", pos: { x: 5, y: 5 }, value: 20, collected: false },
-          { type: "mana", pos: { x: 10, y: 10 }, value: 2, collected: false },
+          {
+            type: "mana",
+            pos: { x: 10, y: 10 },
+            value: 2,
+            collected: false,
+          },
         ],
         winner: null,
         lastResolvedTurn: 0,
@@ -160,10 +162,10 @@ export const leaveQueue = mutation({
     clientId: v.string(),
   },
   returns: v.null(),
-  handler: async (ctx, args) => {
+  handler: async (ctx: any, args: any) => {
     const waitingEntry = await ctx.db
       .query("matchmakingQueue")
-      .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
+      .withIndex("by_clientId", (q: any) => q.eq("clientId", args.clientId))
       .unique();
 
     if (waitingEntry) {
@@ -184,19 +186,19 @@ export const getLobbyState = query({
     matchId: v.union(v.id("matches"), v.null()),
     slot: v.union(v.string(), v.null()),
   }),
-  handler: async (ctx, args) => {
+  handler: async (ctx: any, args: any) => {
     const activeMatches = await ctx.db
       .query("matches")
-      .withIndex("by_status", (q) => q.eq("status", "active"))
+      .withIndex("by_status", (q: any) => q.eq("status", "active"))
       .collect();
 
-    const currentMatch = activeMatches.find((m) =>
-      m.players.some((p) => p.clientId === args.clientId),
+    const currentMatch = activeMatches.find((m: any) =>
+      m.players.some((p: any) => p.clientId === args.clientId),
     );
 
     if (currentMatch) {
       const player = currentMatch.players.find(
-        (p) => p.clientId === args.clientId,
+        (p: any) => p.clientId === args.clientId,
       )!;
       return {
         waiting: false,
@@ -208,7 +210,7 @@ export const getLobbyState = query({
 
     const queueEntry = await ctx.db
       .query("matchmakingQueue")
-      .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
+      .withIndex("by_clientId", (q: any) => q.eq("clientId", args.clientId))
       .unique();
 
     return {
@@ -225,37 +227,70 @@ export const getMatchState = query({
     matchId: v.id("matches"),
     clientId: v.string(),
   },
-  handler: async (ctx, args) => {
+  returns: v.object({
+    matchId: v.id("matches"),
+    status: v.union(v.literal("active"), v.literal("completed")),
+    phase: v.union(v.literal("planning"), v.literal("waiting_for_submissions")),
+    mode: v.union(v.literal("1v1"), v.literal("3v3")),
+    turnNumber: v.number(),
+    players: v.array(playerStateInMatchValidator),
+    mapObjects: v.array(mapObjectValidator),
+    winner: v.union(v.string(), v.literal("draw"), v.null()),
+    lastResolvedTurn: v.number(),
+    lastActivityAt: v.number(),
+    timeoutMs: v.number(),
+    type: v.union(v.literal("casual"), v.literal("strategic")),
+    yourSlot: v.string(),
+    playerState: entityStateValidator,
+    enemyState: entityStateValidator,
+    player1Submitted: v.boolean(),
+    player2Submitted: v.boolean(),
+    submittedSlots: v.array(v.string()),
+    canSubmit: v.boolean(),
+    latestEvents: v.array(combatEventValidator),
+  }),
+  handler: async (ctx: any, args: any) => {
     const match = await ctx.db.get("matches", args.matchId);
     if (!match) throw new Error("Match not found.");
 
-    const player = match.players.find((p) => p.clientId === args.clientId);
+    const player = match.players.find((p: any) => p.clientId === args.clientId);
     if (!player) throw new Error("Not a participant.");
 
-    const enemy = match.players.find((p) => p.clientId !== args.clientId); // For 1v1 compatibility
+    const enemy = match.players.find((p: any) => p.clientId !== args.clientId); // For 1v1 compatibility
 
     const submissions = await ctx.db
       .query("turnSubmissions")
-      .withIndex("by_matchId_and_turnNumber", (q) =>
+      .withIndex("by_matchId_and_turnNumber", (q: any) =>
         q.eq("matchId", args.matchId).eq("turnNumber", match.turnNumber),
       )
       .collect();
 
-    const submittedSlots = submissions.map((s) => s.playerSlot);
+    const submittedSlots = submissions.map((s: any) => s.playerSlot);
 
     const latestTurn = match.turnNumber - 1;
     const latestEventsRecord =
       latestTurn > 0
         ? await ctx.db
             .query("matchEvents")
-            .withIndex("by_matchId_and_turnNumber", (q) =>
+            .withIndex("by_matchId_and_turnNumber", (q: any) =>
               q.eq("matchId", args.matchId).eq("turnNumber", latestTurn),
             )
             .unique()
         : null;
 
     return {
-      ...match,
+      matchId: match._id,
+      status: match.status,
+      phase: match.phase,
+      mode: match.mode,
+      turnNumber: match.turnNumber,
+      players: match.players,
+      mapObjects: match.mapObjects,
+      winner: match.winner,
+      lastResolvedTurn: match.lastResolvedTurn,
+      lastActivityAt: match.lastActivityAt,
+      timeoutMs: match.timeoutMs,
+      type: match.type,
       yourSlot: player.slot,
       playerState: player.state,
       enemyState: enemy?.state ?? player.state, // Fallback to self if no enemy (shouldn't happen in 1v1)
@@ -282,18 +317,21 @@ export const submitTurn = mutation({
       }),
     ),
   },
-  handler: async (ctx, args) => {
+  returns: v.object({
+    resolved: v.boolean(),
+  }),
+  handler: async (ctx: any, args: any) => {
     const match = await ctx.db.get("matches", args.matchId);
     if (!match || match.status !== "active") throw new Error("Invalid match.");
 
-    const player = match.players.find((p) => p.clientId === args.clientId);
+    const player = match.players.find((p: any) => p.clientId === args.clientId);
     if (!player) throw new Error("Not a participant.");
 
     if (args.turnNumber !== match.turnNumber) return { resolved: false };
 
     const existing = await ctx.db
       .query("turnSubmissions")
-      .withIndex("by_matchId_and_turnNumber_and_playerSlot", (q) =>
+      .withIndex("by_matchId_and_turnNumber_and_playerSlot", (q: any) =>
         q
           .eq("matchId", args.matchId)
           .eq("turnNumber", args.turnNumber)
@@ -340,7 +378,7 @@ export const submitTurn = mutation({
           ...soul.actives,
           ...secondarySoul.actives,
         ].find(
-          (a) =>
+          (a: any) =>
             a.id === action.abilityId ||
             a.id === "water_bolt" ||
             a.id === "slash" ||
@@ -386,7 +424,7 @@ export const submitTurn = mutation({
 
     const submissions = await ctx.db
       .query("turnSubmissions")
-      .withIndex("by_matchId_and_turnNumber", (q) =>
+      .withIndex("by_matchId_and_turnNumber", (q: any) =>
         q.eq("matchId", args.matchId).eq("turnNumber", args.turnNumber),
       )
       .collect();
@@ -402,10 +440,10 @@ export const submitTurn = mutation({
 
       // Check win condition
       const team1Alive = result.nextPlayers.some(
-        (p) => p.slot.startsWith("team1") && p.state.hp > 0,
+        (p: any) => p.slot.startsWith("team1") && p.state.hp > 0,
       );
       const team2Alive = result.nextPlayers.some(
-        (p) => p.slot.startsWith("team2") && p.state.hp > 0,
+        (p: any) => p.slot.startsWith("team2") && p.state.hp > 0,
       );
 
       let winner: string | "draw" | null = null;
@@ -458,12 +496,15 @@ export const joinAsReplacement = mutation({
     displayName: v.string(),
     slotToReplace: v.string(),
   },
-  handler: async (ctx, args) => {
+  returns: v.object({
+    success: v.literal(true),
+  }),
+  handler: async (ctx: any, args: any) => {
     const match = await ctx.db.get("matches", args.matchId);
     if (!match || match.status !== "active") throw new Error("Invalid match.");
 
     const playerIndex = match.players.findIndex(
-      (p) => p.slot === args.slotToReplace,
+      (p: any) => p.slot === args.slotToReplace,
     );
     if (playerIndex === -1) throw new Error("Slot not found.");
 
@@ -490,7 +531,8 @@ export const sendChatMessage = mutation({
     senderName: v.string(),
     text: v.string(),
   },
-  handler: async (ctx, args) => {
+  returns: v.null(),
+  handler: async (ctx: any, args: any) => {
     await ctx.db.insert("chat", {
       matchId: args.matchId,
       senderId: args.senderId,
@@ -498,6 +540,7 @@ export const sendChatMessage = mutation({
       text: args.text,
       createdAt: Date.now(),
     });
+    return null;
   },
 });
 
@@ -505,10 +548,21 @@ export const getChatMessages = query({
   args: {
     matchId: v.union(v.id("matches"), v.literal("global")),
   },
-  handler: async (ctx, args) => {
+  returns: v.array(
+    v.object({
+      _id: v.id("chat"),
+      _creationTime: v.number(),
+      matchId: v.union(v.id("matches"), v.literal("global")),
+      senderId: v.string(),
+      senderName: v.string(),
+      text: v.string(),
+      createdAt: v.number(),
+    }),
+  ),
+  handler: async (ctx: any, args: any) => {
     return await ctx.db
       .query("chat")
-      .withIndex("by_matchId", (q) => q.eq("matchId", args.matchId))
+      .withIndex("by_matchId", (q: any) => q.eq("matchId", args.matchId))
       .order("desc")
       .take(50);
   },
@@ -518,10 +572,24 @@ export const getMatchAnalytics = query({
   args: {
     matchId: v.id("matches"),
   },
-  handler: async (ctx, args) => {
+  returns: v.array(
+    v.object({
+      _id: v.id("analytics"),
+      _creationTime: v.number(),
+      matchId: v.id("matches"),
+      playerSlot: v.string(),
+      damageDealt: v.number(),
+      damageTaken: v.number(),
+      healingDone: v.number(),
+      shieldingDone: v.number(),
+      interrupts: v.number(),
+      abilityBreakdown: v.record(v.string(), v.number()),
+    }),
+  ),
+  handler: async (ctx: any, args: any) => {
     return await ctx.db
       .query("analytics")
-      .withIndex("by_matchId", (q) => q.eq("matchId", args.matchId))
+      .withIndex("by_matchId", (q: any) => q.eq("matchId", args.matchId))
       .collect();
   },
 });

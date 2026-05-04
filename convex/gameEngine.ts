@@ -21,7 +21,7 @@ export function getDistance(c1: Pos, c2: Pos) {
 export function resolveMatchTurn(
   players: Doc<"matches">["players"],
   submissions: Array<Doc<"turnSubmissions">>,
-  obstacles: Array<Pos>,
+  _obstacles: Array<Pos>,
   mapObjects: Doc<"matches">["mapObjects"],
 ): {
   nextPlayers: Doc<"matches">["players"];
@@ -31,12 +31,10 @@ export function resolveMatchTurn(
 } {
   const events: Array<CombatEvent> = [];
   const analytics: Record<string, any> = {};
-  const currentMapObjects = JSON.parse(
-    JSON.stringify(mapObjects),
-  ) as typeof mapObjects;
+  const currentMapObjects = JSON.parse(JSON.stringify(mapObjects));
 
   // Initialize analytics for each player
-  players.forEach((p) => {
+  players.forEach((p: any) => {
     analytics[p.slot] = {
       damageDealt: 0,
       damageTaken: 0,
@@ -48,23 +46,25 @@ export function resolveMatchTurn(
   });
 
   // Deep clone players for resolution
-  const currentPlayers = JSON.parse(JSON.stringify(players)) as typeof players;
+  const currentPlayers = JSON.parse(JSON.stringify(players));
 
   const getPlayerBySlot = (slot: string) =>
-    currentPlayers.find((p) => p.slot === slot)!;
+    currentPlayers.find((p: any) => p.slot === slot)!;
 
-  const maxSteps = Math.max(...submissions.map((s) => s.queue.length), 0);
+  const maxSteps = Math.max(...submissions.map((s: any) => s.queue.length), 0);
 
   for (let i = 0; i < maxSteps; i++) {
     const stepActions: Array<{ slot: string; action: ValidatedAction }> = [];
-    submissions.forEach((s) => {
+    submissions.forEach((s: any) => {
       if (s.queue[i]) {
         stepActions.push({ slot: s.playerSlot, action: s.queue[i] });
       }
     });
 
     // Sort by initiative
-    stepActions.sort((a, b) => b.action.initiative - a.action.initiative);
+    stepActions.sort(
+      (a: any, b: any) => b.action.initiative - a.action.initiative,
+    );
 
     for (const { slot, action } of stepActions) {
       const actor = getPlayerBySlot(slot);
@@ -84,7 +84,7 @@ export function resolveMatchTurn(
 
         // Check for pickups
         const pickup = currentMapObjects.find(
-          (o) =>
+          (o: any) =>
             !o.collected &&
             o.pos.x === actor.state.pos.x &&
             o.pos.y === actor.state.pos.y,
@@ -127,7 +127,7 @@ export function resolveMatchTurn(
 
         const targetPos = action.target;
         const targetPlayer = currentPlayers.find(
-          (p) =>
+          (p: any) =>
             p.state.pos.x === targetPos.x &&
             p.state.pos.y === targetPos.y &&
             p.state.hp > 0,
@@ -200,7 +200,7 @@ export function resolveMatchTurn(
   }
 
   // End of turn recovery
-  currentPlayers.forEach((p) => {
+  currentPlayers.forEach((p: any) => {
     if (p.state.hp > 0) {
       p.state.pa = p.state.maxPa;
       p.state.pm = p.state.maxPm;

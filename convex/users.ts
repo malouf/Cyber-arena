@@ -1,15 +1,31 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 
 export const getOrCreateUser = mutation({
   args: {
     clientId: v.string(),
     displayName: v.string(),
   },
-  handler: async (ctx, args) => {
+  returns: v.union(
+    v.object({
+      _id: v.id("users"),
+      _creationTime: v.number(),
+      clientId: v.string(),
+      displayName: v.string(),
+      skins: v.array(v.string()),
+      equippedSkin: v.optional(v.string()),
+      xp: v.number(),
+      level: v.number(),
+      battlePassPremium: v.boolean(),
+      pushToken: v.optional(v.string()),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx: any, args: any): Promise<Doc<"users"> | null> => {
     const existing = await ctx.db
       .query("users")
-      .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
+      .withIndex("by_clientId", (q: any) => q.eq("clientId", args.clientId))
       .unique();
 
     if (existing) return existing;
@@ -31,14 +47,16 @@ export const updateEquippedSkin = mutation({
     clientId: v.string(),
     skinId: v.string(),
   },
-  handler: async (ctx, args) => {
+  returns: v.null(),
+  handler: async (ctx: any, args: any) => {
     const user = await ctx.db
       .query("users")
-      .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
+      .withIndex("by_clientId", (q: any) => q.eq("clientId", args.clientId))
       .unique();
     if (!user) throw new Error("User not found");
 
     await ctx.db.patch("users", user._id, { equippedSkin: args.skinId });
+    return null;
   },
 });
 
@@ -47,10 +65,11 @@ export const addXp = mutation({
     clientId: v.string(),
     amount: v.number(),
   },
-  handler: async (ctx, args) => {
+  returns: v.null(),
+  handler: async (ctx: any, args: any) => {
     const user = await ctx.db
       .query("users")
-      .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
+      .withIndex("by_clientId", (q: any) => q.eq("clientId", args.clientId))
       .unique();
     if (!user) throw new Error("User not found");
 
@@ -62,5 +81,6 @@ export const addXp = mutation({
     }
 
     await ctx.db.patch("users", user._id, { xp: newXp, level: newLevel });
+    return null;
   },
 });

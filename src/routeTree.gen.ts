@@ -8,80 +8,80 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root'
-import { Route as PracticeRouteImport } from './routes/practice'
-import { Route as MultiplayerRouteImport } from './routes/multiplayer'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as rootRouteImport } from "./routes/__root";
+import { Route as PracticeRouteImport } from "./routes/practice";
+import { Route as MultiplayerRouteImport } from "./routes/multiplayer";
+import { Route as IndexRouteImport } from "./routes/index";
 
 const PracticeRoute = PracticeRouteImport.update({
-  id: '/practice',
-  path: '/practice',
+  id: "/practice",
+  path: "/practice",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const MultiplayerRoute = MultiplayerRouteImport.update({
-  id: '/multiplayer',
-  path: '/multiplayer',
+  id: "/multiplayer",
+  path: "/multiplayer",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+  id: "/",
+  path: "/",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/multiplayer': typeof MultiplayerRoute
-  '/practice': typeof PracticeRoute
+  "/": typeof IndexRoute;
+  "/multiplayer": typeof MultiplayerRoute;
+  "/practice": typeof PracticeRoute;
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/multiplayer': typeof MultiplayerRoute
-  '/practice': typeof PracticeRoute
+  "/": typeof IndexRoute;
+  "/multiplayer": typeof MultiplayerRoute;
+  "/practice": typeof PracticeRoute;
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/multiplayer': typeof MultiplayerRoute
-  '/practice': typeof PracticeRoute
+  __root__: typeof rootRouteImport;
+  "/": typeof IndexRoute;
+  "/multiplayer": typeof MultiplayerRoute;
+  "/practice": typeof PracticeRoute;
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/multiplayer' | '/practice'
-  fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/multiplayer' | '/practice'
-  id: '__root__' | '/' | '/multiplayer' | '/practice'
-  fileRoutesById: FileRoutesById
+  fileRoutesByFullPath: FileRoutesByFullPath;
+  fullPaths: "/" | "/multiplayer" | "/practice";
+  fileRoutesByTo: FileRoutesByTo;
+  to: "/" | "/multiplayer" | "/practice";
+  id: "__root__" | "/" | "/multiplayer" | "/practice";
+  fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  MultiplayerRoute: typeof MultiplayerRoute
-  PracticeRoute: typeof PracticeRoute
+  IndexRoute: typeof IndexRoute;
+  MultiplayerRoute: typeof MultiplayerRoute;
+  PracticeRoute: typeof PracticeRoute;
 }
 
-declare module '@tanstack/react-router' {
+declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
-    '/practice': {
-      id: '/practice'
-      path: '/practice'
-      fullPath: '/practice'
-      preLoaderRoute: typeof PracticeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/multiplayer': {
-      id: '/multiplayer'
-      path: '/multiplayer'
-      fullPath: '/multiplayer'
-      preLoaderRoute: typeof MultiplayerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+    "/practice": {
+      id: "/practice";
+      path: "/practice";
+      fullPath: "/practice";
+      preLoaderRoute: typeof PracticeRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/multiplayer": {
+      id: "/multiplayer";
+      path: "/multiplayer";
+      fullPath: "/multiplayer";
+      preLoaderRoute: typeof MultiplayerRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/": {
+      id: "/";
+      path: "/";
+      fullPath: "/";
+      preLoaderRoute: typeof IndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
   }
 }
 
@@ -89,16 +89,16 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   MultiplayerRoute: MultiplayerRoute,
   PracticeRoute: PracticeRoute,
-}
+};
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>()
+  ._addFileTypes<FileRouteTypes>();
 
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
+import type { getRouter } from "./router.tsx";
+import type { createStart } from "@tanstack/react-start";
+declare module "@tanstack/react-start" {
   interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
+    ssr: true;
+    router: Awaited<ReturnType<typeof getRouter>>;
   }
 }

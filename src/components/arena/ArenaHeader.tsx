@@ -1,15 +1,15 @@
-import type { Soul } from '../../game/types'
-import type { EntityState } from '../../game/engine'
-import type { ArenaPhase } from './gameReducer'
+import type { Soul } from "../../game/types";
+import type { EntityState } from "../../game/engine";
+import type { ArenaPhase } from "./gameReducer";
 
 type Props = {
-  pSoul: Soul
-  playerStats: EntityState
-  simStats: { pa: number; pm: number; mana: number }
-  enemyStats: EntityState
-  phase: ArenaPhase
-  onAbort: () => void
-}
+  pSoul: Soul;
+  playerStats: EntityState;
+  simStats: { pa: number; pm: number; mana: number };
+  enemyStats: EntityState;
+  phase: ArenaPhase;
+  onAbort: () => void;
+};
 
 export function ArenaHeader({
   pSoul,
@@ -20,7 +20,11 @@ export function ArenaHeader({
   onAbort,
 }: Props) {
   const phaseLabel =
-    phase === 'planning' ? 'Planning' : phase === 'resolving' ? 'Resolving' : 'Playback'
+    phase === "planning"
+      ? "Planning"
+      : phase === "resolving"
+        ? "Resolving"
+        : "Playback";
 
   return (
     <header className="px-6 py-4 border-b border-neutral-900 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-black z-50">
@@ -37,11 +41,11 @@ export function ArenaHeader({
         </h1>
         <span
           className={`rounded border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.2em] ${
-            phase === 'planning'
-              ? 'border-white/30 text-white'
-              : phase === 'resolving'
-                ? 'border-red-600/60 text-red-500'
-                : 'border-blue-500/50 text-blue-400'
+            phase === "planning"
+              ? "border-white/30 text-white"
+              : phase === "resolving"
+                ? "border-red-600/60 text-red-500"
+                : "border-blue-500/50 text-blue-400"
           }`}
         >
           {phaseLabel}
@@ -55,18 +59,22 @@ export function ArenaHeader({
           </p>
           <div className="flex gap-4">
             <div>
-              <p className="text-[8px] text-red-600 uppercase mb-1">HP ({playerStats.hp})</p>
+              <p className="text-[8px] text-red-600 uppercase mb-1">
+                HP ({playerStats.hp})
+              </p>
               <div className="flex gap-[2px]">
-                {Array.from({ length: Math.ceil(playerStats.maxHp / 10) }).map((_, i) => (
-                  <div
-                    key={i}
-                    className={`w-3 h-1.5 ${
-                      i < Math.ceil(playerStats.hp / 10)
-                        ? 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]'
-                        : 'bg-neutral-900'
-                    }`}
-                  />
-                ))}
+                {Array.from({ length: Math.ceil(playerStats.maxHp / 10) }).map(
+                  (_, i) => (
+                    <div
+                      key={i}
+                      className={`w-3 h-1.5 ${
+                        i < Math.ceil(playerStats.hp / 10)
+                          ? "bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]"
+                          : "bg-neutral-900"
+                      }`}
+                    />
+                  ),
+                )}
               </div>
             </div>
             <div>
@@ -76,7 +84,9 @@ export function ArenaHeader({
                   <div
                     key={i}
                     className={`w-3 h-1.5 ${
-                      i < simStats.pa ? 'bg-white' : 'bg-neutral-900 border border-neutral-800'
+                      i < simStats.pa
+                        ? "bg-white"
+                        : "bg-neutral-900 border border-neutral-800"
                     }`}
                   />
                 ))}
@@ -90,8 +100,8 @@ export function ArenaHeader({
                     key={i}
                     className={`w-3 h-1.5 ${
                       i < simStats.pm
-                        ? 'bg-neutral-400'
-                        : 'bg-neutral-900 border border-neutral-800'
+                        ? "bg-neutral-400"
+                        : "bg-neutral-900 border border-neutral-800"
                     }`}
                   />
                 ))}
@@ -105,8 +115,8 @@ export function ArenaHeader({
                     key={i}
                     className={`w-2 h-1.5 rounded-full ${
                       i < simStats.mana
-                        ? 'bg-blue-500 shadow-[0_0_8px_#3b82f6]'
-                        : 'bg-neutral-900'
+                        ? "bg-blue-500 shadow-[0_0_8px_#3b82f6]"
+                        : "bg-neutral-900"
                     }`}
                   />
                 ))}
@@ -126,20 +136,22 @@ export function ArenaHeader({
               HP ({enemyStats.hp})
             </p>
             <div className="flex gap-[2px] justify-end">
-              {Array.from({ length: Math.ceil(enemyStats.maxHp / 10) }).map((_, i) => (
-                <div
-                  key={i}
-                  className={`w-3 h-1.5 ${
-                    i < Math.ceil(enemyStats.hp / 10)
-                      ? 'bg-red-600 shadow-[0_0_8px_rgba(220,38,38,0.6)]'
-                      : 'bg-neutral-900'
-                  }`}
-                />
-              ))}
+              {Array.from({ length: Math.ceil(enemyStats.maxHp / 10) }).map(
+                (_, i) => (
+                  <div
+                    key={i}
+                    className={`w-3 h-1.5 ${
+                      i < Math.ceil(enemyStats.hp / 10)
+                        ? "bg-red-600 shadow-[0_0_8px_rgba(220,38,38,0.6)]"
+                        : "bg-neutral-900"
+                    }`}
+                  />
+                ),
+              )}
             </div>
           </div>
         </div>
       </div>
     </header>
-  )
+  );
 }

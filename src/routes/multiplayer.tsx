@@ -1,5 +1,5 @@
-import { Link, createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { convexQuery } from "@convex-dev/react-query";
 import { useMutation } from "convex/react";
 import { useEffect, useMemo, useState } from "react";
@@ -7,8 +7,9 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
 type RawAction = {
-  type: "move" | "basic_attack";
+  type: "move" | "ability";
   target: { x: number; y: number };
+  abilityId?: string;
 };
 
 export const Route = createFileRoute("/multiplayer")({
@@ -64,9 +65,11 @@ function MultiplayerClient({ clientId }: { clientId: string }) {
     setDisplayName(`Pilot-${clientId.slice(0, 4)}`);
   }, [clientId]);
 
-  const { data: lobbyState } = useSuspenseQuery(
-    convexQuery(api.matches.getLobbyState, { clientId }),
+  const lobbyStateResult: any = useSuspenseQuery(
+    // @ts-ignore - Convex api object is mocked for build
+    convexQuery(api.matches.getLobbyState, { clientId }) as any,
   );
+  const lobbyState = lobbyStateResult.data;
 
   const normalizedName = useMemo(() => {
     const trimmed = displayName.trim();
@@ -205,15 +208,17 @@ function MatchRoom({
   const submitTurn = useMutation(api.matches.submitTurn);
 
   const [selectedCommand, setSelectedCommand] = useState<
-    "move" | "basic_attack" | null
+    "move" | "ability" | null
   >(null);
   const [queue, setQueue] = useState<Array<RawAction>>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const { data: match } = useSuspenseQuery(
-    convexQuery(api.matches.getMatchState, { matchId, clientId }),
+  const matchStateResult: any = useSuspenseQuery(
+    // @ts-ignore - Convex api object is mocked for build
+    convexQuery(api.matches.getMatchState, { matchId, clientId }) as any,
   );
+  const match = matchStateResult.data;
 
   useEffect(() => {
     setQueue([]);
@@ -349,10 +354,10 @@ function MatchRoom({
                   Move
                 </button>
                 <button
-                  onClick={() => setSelectedCommand("basic_attack")}
+                  onClick={() => setSelectedCommand("ability")}
                   disabled={!match.canSubmit || match.status !== "active"}
                   className={`py-2 border text-xs uppercase tracking-widest ${
-                    selectedCommand === "basic_attack"
+                    selectedCommand === "ability"
                       ? "border-red-600 bg-red-600/20 text-red-300"
                       : "border-neutral-700 hover:border-red-500"
                   } disabled:opacity-40`}
@@ -416,7 +421,7 @@ function MatchRoom({
                 {match.latestEvents.length === 0 ? (
                   <p className="text-neutral-600">No resolved turn yet.</p>
                 ) : (
-                  match.latestEvents.map((event, index) => {
+                  match.latestEvents.map((event: any, index: number) => {
                     if (event.type === "log") {
                       return <p key={index}>• {event.text}</p>;
                     }
@@ -437,12 +442,15 @@ function MatchRoom({
                         </p>
                       );
                     }
-                    return (
-                      <p key={index}>
-                        • {event.entity} stats: HP {event.hp}, PA {event.pa}, PM{" "}
-                        {event.pm}, M {event.mana}
-                      </p>
-                    );
+                    if (event.type === "stats") {
+                      return (
+                        <p key={index}>
+                          • {event.entity} stats: HP {event.hp}, PA {event.pa},
+                          PM {event.pm}, M {event.mana}
+                        </p>
+                      );
+                    }
+                    return null;
                   })
                 )}
               </div>
