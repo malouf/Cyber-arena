@@ -1,5 +1,7 @@
 export type SoulId = "onde" | "fury" | "aegis";
 
+export type Pos = { x: number; y: number };
+
 export type Ability = {
   id: string;
   name: string;
@@ -34,7 +36,7 @@ export type Soul = {
 
 export type Action = {
   type: "move" | "ability";
-  target: { x: number; y: number };
+  target: Pos;
   ability?: Ability;
   paCost: number;
   pmCost: number;
@@ -42,4 +44,39 @@ export type Action = {
   name: string;
   initiative: number;
   entity?: "player" | "enemy";
+};
+
+export type EntityState = {
+  id: "player" | "enemy";
+  hp: number;
+  maxHp: number;
+  pa: number;
+  maxPa: number;
+  pm: number;
+  maxPm: number;
+  mana: number;
+  maxMana: number;
+  pos: Pos;
+  passives: Array<string>;
+};
+
+export type CombatEvent =
+  | { type: "log"; text: string }
+  | { type: "effect"; text: string; color: string; pos: Pos }
+  | { type: "move"; entity: "player" | "enemy"; pos: Pos }
+  | {
+      type: "stats";
+      entity: "player" | "enemy";
+      hp?: number;
+      pa?: number;
+      pm?: number;
+      mana?: number;
+    }
+  | { type: "delay"; ms: number };
+
+export type TurnState = {
+  cooldowns: Record<string, number>;
+  usesThisTurn: Record<string, number>;
+  flowStateRange: number;
+  bonusPa: number;
 };

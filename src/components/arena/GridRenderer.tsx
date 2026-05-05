@@ -1,5 +1,6 @@
-import { obstacles } from "../../game/data";
+import { useShallow } from "zustand/shallow";
 import { useGameStore } from "./gameStore";
+import { getDistance, getSimulatedResources, isCellWall } from "./selectors";
 
 type Props = {
   buildPassives: Array<string>;
@@ -8,15 +9,26 @@ type Props = {
 export function GridRenderer({ buildPassives }: Props) {
   const playerPos = useGameStore((s) => s.server.player.pos);
   const enemyPos = useGameStore((s) => s.server.enemy.pos);
-  const actionQueue = useGameStore((s) => s.server.actionQueue);
-  const activeCommand = useGameStore((s) => s.ui.activeCommand);
-  const simStats = useGameStore((s) => s.getSimulatedResources());
-  const flowStateRange = useGameStore(
-    (s) => s.server.persistentBuffs.flowStateRange,
+
+  const { actionQueue, flowStateRange } = useGameStore(
+    useShallow((s) => ({
+      actionQueue: s.server.actionQueue,
+      flowStateRange: s.server.persistentBuffs.flowStateRange,
+    })),
   );
-  const hoveredCell = useGameStore((s) => s.ui.hoveredCell);
-  const visualEffects = useGameStore((s) => s.ui.visualEffects);
-  const isResolving = useGameStore((s) => s.isResolving());
+
+  const { activeCommand, hoveredCell, visualEffects, phase } = useGameStore(
+    useShallow((s) => ({
+      activeCommand: s.ui.activeCommand,
+      hoveredCell: s.ui.hoveredCell,
+      visualEffects: s.ui.visualEffects,
+      phase: s.ui.phase,
+    })),
+  );
+
+  const simStats = useGameStore(useShallow(getSimulatedResources));
+
+  const isResolving = phase !== "planning";
 
   const setHoveredCell = useGameStore((s) => s.setHoveredCell);
   const handleCellClick = useGameStore((s) => s.handleCellClick);
@@ -25,15 +37,6 @@ export function GridRenderer({ buildPassives }: Props) {
   const visionRange = 6;
   const rows = Array.from({ length: gridSize }, (_, i) => i);
   const cols = Array.from({ length: gridSize }, (_, i) => i);
-
-  const getDistance = (
-    c1: { x: number; y: number },
-    c2: { x: number; y: number },
-  ) => {
-    const dx = c2.x - c1.x;
-    const dy = c2.y - c1.y;
-    return Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dx + dy));
-  };
 
   return (
     <div className="flex-1 bg-neutral-950 border border-neutral-900 relative overflow-auto scroll-smooth flex p-4 touch-pan-x touch-pan-y cursor-grab active:cursor-grabbing">
@@ -50,7 +53,7 @@ export function GridRenderer({ buildPassives }: Props) {
               const cell = { x, y };
               const isUnit = playerPos.x === x && playerPos.y === y;
               const isEnemyRaw = enemyPos.x === x && enemyPos.y === y;
-              const isWall = obstacles.some((o) => o.x === x && o.y === y);
+              const isWall = isCellWall(cell);
               const distFromPlayer = getDistance(playerPos, cell);
               const isVisible = distFromPlayer <= visionRange;
 
@@ -70,7 +73,10 @@ export function GridRenderer({ buildPassives }: Props) {
               let inValidRange = false;
               if (activeCommand?.type === "move") {
                 inValidRange =
-                  distance > 0 && distance <= simStats.pm && !isWall;
+                  distance > 0 &&
+                  distance <= simStats.pm &&
+                  !isWall &&
+                  !isEnemyRaw;
               } else if (activeCommand?.type === "ability") {
                 let effectiveRange = activeCommand.ability.range;
                 if (

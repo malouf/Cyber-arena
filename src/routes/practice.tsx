@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { DraftPhase, type PlayerBuild } from "../components/arena/DraftPhase";
 import { ArenaView } from "../components/arena/ArenaView";
-import type { ArenaPhase } from "../components/arena/gameStore";
+import type { ArenaPhase } from "../components/arena/types";
 
 type PracticePhase = "drafting" | ArenaPhase;
 

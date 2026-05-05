@@ -1,18 +1,25 @@
+import { useShallow } from "zustand/shallow";
 import { useGameStore } from "./gameStore";
+import { selectActionQueue, selectLogs, selectPhase } from "./selectors";
 
 export function SequencePanel() {
-  const actionQueue = useGameStore((s) => s.server.actionQueue);
-  const logs = useGameStore((s) => s.ui.logs);
-  const phase = useGameStore((s) => s.ui.phase);
-  const isResolving = useGameStore((s) => s.isResolving());
+  const actionQueue = useGameStore(selectActionQueue);
+  const logs = useGameStore(selectLogs);
+  const phase = useGameStore(selectPhase);
+  const isResolving = phase !== "planning";
   const clearQueue = useGameStore((s) => s.clearQueue);
   const runTurnResolution = useGameStore((s) => s.runTurnResolution);
 
-  const player = useGameStore((s) => s.server.player);
-  const enemy = useGameStore((s) => s.server.enemy);
-  const cooldowns = useGameStore((s) => s.server.cooldowns);
-  const usesThisTurn = useGameStore((s) => s.server.usesThisTurn);
-  const persistentBuffs = useGameStore((s) => s.server.persistentBuffs);
+  const { player, enemy, cooldowns, usesThisTurn, persistentBuffs } =
+    useGameStore(
+      useShallow((s) => ({
+        player: s.server.player,
+        enemy: s.server.enemy,
+        cooldowns: s.server.cooldowns,
+        usesThisTurn: s.server.usesThisTurn,
+        persistentBuffs: s.server.persistentBuffs,
+      })),
+    );
 
   const resolveTurn = async () => {
     if (phase !== "planning") return;

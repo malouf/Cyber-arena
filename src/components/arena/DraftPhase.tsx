@@ -154,6 +154,9 @@ export function DraftPhase({ onComplete }: Props) {
     const availableActives = [...pSoul.actives, ...sSoul.actives];
     const availablePassives = [...pSoul.passives, ...sSoul.passives];
 
+    const canDeploy =
+      selectedActives.length === 3 && selectedPassives.length === 2;
+
     return (
       <main className="min-h-screen bg-black text-neutral-100 flex flex-col font-sans">
         <header className="px-6 py-4 border-b border-neutral-900 flex justify-between items-center bg-black sticky top-0 z-50">
@@ -169,10 +172,10 @@ export function DraftPhase({ onComplete }: Props) {
             </h1>
           </div>
           <button
-            disabled={selectedActives.length === 0}
+            disabled={!canDeploy}
             onClick={finalizeDraft}
             className={`px-8 py-3 text-xs font-black uppercase tracking-[0.2em] transition-colors
-              ${selectedActives.length > 0 ? "bg-white text-black hover:bg-red-600 hover:text-white" : "bg-neutral-900 text-neutral-600"}`}
+              ${canDeploy ? "bg-white text-black hover:bg-red-600 hover:text-white" : "bg-neutral-900 text-neutral-600 cursor-not-allowed"}`}
           >
             Deploy
           </button>
@@ -217,6 +220,10 @@ export function DraftPhase({ onComplete }: Props) {
                   <div className="text-[10px] font-mono text-neutral-500 mt-1">
                     {pSoul.baseAttack.desc}
                   </div>
+                  <div className="text-[9px] font-mono text-red-500 mt-2">
+                    DMG: {pSoul.baseAttack.damage} | RNG:{" "}
+                    {pSoul.baseAttack.range}
+                  </div>
                 </div>
                 <div className="p-3 border border-red-900/50 bg-red-900/10 relative overflow-hidden">
                   <div className="text-[10px] font-bold text-red-500 uppercase mb-1">
@@ -227,6 +234,10 @@ export function DraftPhase({ onComplete }: Props) {
                   </div>
                   <div className="text-[10px] font-mono text-neutral-500 mt-1">
                     {pSoul.ultimate.desc}
+                  </div>
+                  <div className="text-[9px] font-mono text-red-500 mt-2">
+                    DMG: {pSoul.ultimate.damage} | RNG: {pSoul.ultimate.range} |
+                    CD: {pSoul.ultimate.cooldown}
                   </div>
                 </div>
               </div>
@@ -277,9 +288,18 @@ export function DraftPhase({ onComplete }: Props) {
                           )}
                         </div>
                       </div>
-                      <p className="text-[10px] text-neutral-400 font-mono leading-relaxed">
+                      <p className="text-[10px] text-neutral-400 font-mono leading-relaxed mb-3">
                         {ability.desc}
                       </p>
+                      <div className="flex justify-between items-center border-t border-neutral-900 pt-2">
+                        <span className="text-[9px] font-mono text-red-500">
+                          DMG: {ability.damage} | RNG: {ability.range}
+                        </span>
+                        <span className="text-[9px] font-mono text-neutral-500">
+                          INIT: {ability.initiative}{" "}
+                          {ability.cooldown ? `| CD: ${ability.cooldown}` : ""}
+                        </span>
+                      </div>
                     </button>
                   );
                 })}

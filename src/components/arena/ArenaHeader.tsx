@@ -1,6 +1,5 @@
-import type { Soul } from "../../game/types";
-import type { EntityState } from "../../game/engine";
-import type { ArenaPhase } from "./gameReducer";
+import type { EntityState, Soul } from "../../game/types";
+import type { ArenaPhase } from "./types";
 
 type Props = {
   pSoul: Soul;

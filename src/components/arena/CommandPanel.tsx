@@ -1,5 +1,5 @@
 import type { Ability, Soul } from "../../game/types";
-import type { ActiveCommand } from "./gameStore";
+import type { ActiveCommand } from "./types";
 
 type Props = {
   activeCommand: ActiveCommand;
