@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/shallow";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useMatchSync } from "../../hooks/useMatchSync";
 
 import { soulData } from "../../game/data";
-import { generateEnemyBuild } from "../../game/ai";
 import { ArenaHeader } from "./ArenaHeader";
 import { GridRenderer } from "./GridRenderer";
 import { CommandPanel } from "./CommandPanel";
@@ -63,12 +62,10 @@ export function ArenaView({ build, matchMode, onAbort, onPhaseChange }: Props) {
   const turnNumber = useGameStore((s) => s.server.turnNumber);
 
   // Sync with server state in multiplayer mode
-  const {
-    latestEvents: _unusedEvents,
-    status,
-    winner,
-  } = useMatchSync(matchMode?.matchId ?? null, matchMode?.clientId ?? null);
-  void _unusedEvents; // TODO: use for event playback
+  const { status, winner } = useMatchSync(
+    matchMode?.matchId ?? null,
+    matchMode?.clientId ?? null,
+  );
 
   // Extract passive IDs from loadout for local mode
   const passiveIds = useMemo(() => {
@@ -107,8 +104,10 @@ export function ArenaView({ build, matchMode, onAbort, onPhaseChange }: Props) {
       effects: [],
     };
 
-    const initialEnemyState = generateEnemyBuild();
-    initializeGame(initialPlayerState, initialEnemyState);
+    import("../../game/ai").then(({ generateEnemyBuild }) => {
+      const initialEnemyState = generateEnemyBuild();
+      initializeGame(initialPlayerState, initialEnemyState);
+    });
   }, [build, initializeGame, pSoul, passiveIds, matchMode]);
 
   useEffect(() => {
@@ -142,6 +141,25 @@ export function ArenaView({ build, matchMode, onAbort, onPhaseChange }: Props) {
 
     useMultiplayerStore.getState().addToQueue(action);
     handleSetActiveCommand(null);
+  };
+
+  // Multiplayer: submit turn
+  const handleSubmitTurn = async () => {
+    if (!matchMode || queue.length === 0 || pendingSubmit) return;
+
+    setPendingSubmit(true);
+    try {
+      await submitTurn({
+        matchId: matchMode.matchId,
+        clientId: matchMode.clientId,
+        turnNumber,
+        queue,
+      });
+      clearQueue();
+    } catch (error) {
+      console.error("Turn submission failed:", error);
+      setPendingSubmit(false);
+    }
   };
 
   return (

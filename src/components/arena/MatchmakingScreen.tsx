@@ -19,7 +19,6 @@ export function MatchmakingScreen({ clientId }: Props) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isInQueue, setIsInQueue] = useState(false);
   const [showDraft, setShowDraft] = useState(false);
-  const [selectedBuild, setSelectedBuild] = useState<PlayerBuild | null>(null);
 
   useEffect(() => {
     const existing = window.localStorage.getItem("arena_async_display_name");

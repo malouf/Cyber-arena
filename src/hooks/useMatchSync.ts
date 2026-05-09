@@ -1,9 +1,9 @@
 import { useCallback, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { soulData } from "../game/data";
 import { useGameStore } from "../components/arena/gameStore";
 import { useMultiplayerStore } from "../components/arena/multiplayerStore";
+import { soulData } from "../game/data";
 import type { EntityState, LoadoutSlot } from "../game/types";
 
 type ServerMatchState = {
