@@ -4,6 +4,7 @@ import type {
   Action,
   CombatEvent,
   EntityState,
+  Interactable,
   Pos,
   TurnState,
 } from "./types";
@@ -25,16 +26,27 @@ function getNeighbors(pos: Pos): Array<Pos> {
   ];
 }
 
+export interface ResolveTurnParams {
+  interactables?: Array<Interactable>;
+  isRestTurn?: boolean;
+  skipRequested?: boolean;
+}
+
 export function resolveTurn(
   pState: EntityState,
   eState: EntityState,
   pQueue: Array<Action>,
   turnState: TurnState,
-): { events: Array<CombatEvent>; nextTurnState: TurnState } {
+  params: ResolveTurnParams = {},
+): { events: Array<CombatEvent>; nextTurnState: TurnState; interactables: Array<Interactable> } {
   const events: Array<CombatEvent> = [];
+  const { interactables: initialInteractables = [], isRestTurn = false, skipRequested = false } = params;
+
+  // Clone interactables to track state
+  const interactables = initialInteractables.map(i => ({ ...i }));
 
   // Clone state for simulation
-  const pStats = { ...pState, pa: pState.pa + turnState.bonusPa };
+  const pStats = { ...pState, pa: pState.pa + turnState.bonusPa + (isRestTurn ? 1 : 0) };
   const eStats = { ...eState };
   let pPos = { ...pState.pos };
   let ePos = { ...eState.pos };
@@ -46,6 +58,12 @@ export function resolveTurn(
   let nextFlowStateRange = 0;
 
   events.push({ type: "log", text: "> INITIATING SEQUENCE RESOLUTION" });
+
+  // Apply rest bonus logging
+  if (isRestTurn || skipRequested) {
+    events.push({ type: "log", text: "> REST BONUS APPLIED: +1 PA" });
+    events.push({ type: "rest_triggered", entity: "player" });
+  }
 
   // --- AI LOGIC ---
   const eQueue: Array<Action> = [];
@@ -64,7 +82,11 @@ export function resolveTurn(
           (o) => o.x === neighbor.x && o.y === neighbor.y,
         );
         const isPlayer = neighbor.x === pPos.x && neighbor.y === pPos.y;
-        if (isWall || isPlayer) continue;
+        // Check for walls from interactables
+        const isInteractableWall = interactables.some(
+          (i) => i.type === "wall" && i.pos.x === neighbor.x && i.pos.y === neighbor.y,
+        );
+        if (isWall || isPlayer || isInteractableWall) continue;
 
         const d = getDistance(neighbor, pPos);
         if (d < minDist) {
@@ -109,6 +131,21 @@ export function resolveTurn(
     }
   }
 
+  // Helper to check for interactables at position
+  const checkInteractables = (entity: "player" | "enemy", pos: Pos) => {
+    const triggered: Array<Interactable> = [];
+    for (const interactable of interactables) {
+      if (
+        interactable.pos.x === pos.x &&
+        interactable.pos.y === pos.y &&
+        (interactable.triggeredBy === entity || interactable.triggeredBy === "both")
+      ) {
+        triggered.push(interactable);
+      }
+    }
+    return triggered;
+  };
+
   const applyDamage = (
     target: "player" | "enemy",
     amount: number,
@@ -116,8 +153,15 @@ export function resolveTurn(
   ) => {
     if (target === "player") {
       let finalDamage = amount;
-      if (pStats.passives.includes("heavy_plating"))
+      // Check for heavy_plating passive
+      if (pStats.passives.includes("heavy_plating")) {
+        const mitigated = Math.min(3, finalDamage);
         finalDamage = Math.max(0, finalDamage - 3);
+        events.push({
+          type: "log",
+          text: `> Heavy Plating mitigated ${mitigated} damage!`,
+        });
+      }
       pStats.hp -= finalDamage;
       events.push({
         type: "effect",
@@ -182,7 +226,8 @@ export function resolveTurn(
 
       if (action.type === "move") {
         if (isPlayer) {
-          cellsMovedThisTurn += getDistance(pPos, action.target);
+          const startPos = pPos;
+          cellsMovedThisTurn += getDistance(startPos, action.target);
           pPos = action.target;
           pStats.pm -= action.pmCost;
           pStats.pa -= action.paCost;
@@ -195,9 +240,32 @@ export function resolveTurn(
             pa: pStats.pa,
             mana: pStats.mana,
           });
+
+          // Check for interactables at new position
+          const triggered = checkInteractables("player", pPos);
+          for (const int of triggered) {
+            if (int.type === "mana_well") {
+              pStats.mana = Math.min(pStats.maxMana, pStats.mana + int.value);
+              events.push({
+                type: "log",
+                text: `> Mana Well restored ${int.value} Mana!`,
+              });
+              events.push({ type: "stats", entity: "player", mana: pStats.mana });
+              events.push({ type: "interact", entity: "player", interactableId: int.id, interactableType: int.type });
+            }
+          }
         } else {
           ePos = action.target;
           events.push({ type: "move", entity: "enemy", pos: { ...ePos } });
+
+          // Check for interactables for enemy
+          const triggered = checkInteractables("enemy", ePos);
+          for (const int of triggered) {
+            if (int.type === "mana_well") {
+              eStats.mana = Math.min(eStats.maxMana, eStats.mana + int.value);
+              events.push({ type: "interact", entity: "enemy", interactableId: int.id, interactableType: int.type });
+            }
+          }
         }
         events.push({
           type: "log",
@@ -271,7 +339,11 @@ export function resolveTurn(
                   (o) => o.x === n.x && o.y === n.y,
                 );
                 const isMe = n.x === myPos.x && n.y === myPos.y;
-                if (!isWall && !isMe) {
+                // Check for interactable walls
+                const isInteractableWall = interactables.some(
+                  (i) => i.type === "wall" && i.pos.x === n.x && i.pos.y === n.y,
+                );
+                if (!isWall && !isMe && !isInteractableWall) {
                   minDist = d;
                   bestNeighbor = n;
                 }
@@ -297,6 +369,20 @@ export function resolveTurn(
                 type: "log",
                 text: `> Magnetic Pull pulls target closer!`,
               });
+
+              // Drain Force passive check
+              if (isPlayer && pStats.passives.includes("drain_force")) {
+                pStats.mana = Math.min(pStats.maxMana, pStats.mana + 1);
+                events.push({
+                  type: "stats",
+                  entity: "player",
+                  mana: pStats.mana,
+                });
+                events.push({
+                  type: "log",
+                  text: `> Drain de Force restored 1 Mana!`,
+                });
+              }
             }
           } else {
             events.push({
@@ -354,6 +440,25 @@ export function resolveTurn(
           } else {
             events.push({ type: "log", text: `> Impulsion MISSED.` });
           }
+          continue;
+        }
+
+        // Handle trap abilities (create walls)
+        if (ability.type === "trap") {
+          const newWall: Interactable = {
+            id: `trap_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+            type: "wall",
+            pos: action.target,
+            duration: ability.cooldown || 1,
+            value: 0,
+            ownerId: "player",
+            triggeredBy: "both",
+          };
+          interactables.push(newWall);
+          events.push({
+            type: "log",
+            text: `> ${ability.name} created a wall at [${action.target.x}, ${action.target.y}]!`,
+          });
           continue;
         }
 
@@ -431,6 +536,15 @@ export function resolveTurn(
     });
   }
 
+  // Update interactable durations and remove expired ones
+  const updatedInteractables = interactables.filter((i) => {
+    if (i.duration > 0) {
+      i.duration -= 1;
+      return i.duration !== 0;
+    }
+    return true;
+  });
+
   // End of turn cleanup
   pStats.pa = pStats.maxPa;
   pStats.pm = pStats.maxPm;
@@ -459,6 +573,8 @@ export function resolveTurn(
       usesThisTurn: {},
       flowStateRange: nextFlowStateRange,
       bonusPa: nextBonusPa,
+      isRestTurn: false,
     },
+    interactables: updatedInteractables,
   };
 }

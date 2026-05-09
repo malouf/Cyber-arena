@@ -8,6 +8,7 @@ type Props = {
   enemyStats: EntityState;
   phase: ArenaPhase;
   onAbort: () => void;
+  onToggleStats?: () => void;
 };
 
 export function ArenaHeader({
@@ -17,6 +18,7 @@ export function ArenaHeader({
   enemyStats,
   phase,
   onAbort,
+  onToggleStats,
 }: Props) {
   const phaseLabel =
     phase === "planning"
@@ -150,6 +152,15 @@ export function ArenaHeader({
             </div>
           </div>
         </div>
+
+        {onToggleStats && (
+          <button
+            onClick={onToggleStats}
+            className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest border border-neutral-700 bg-neutral-900 text-neutral-400 hover:text-white hover:border-neutral-500 transition-colors"
+          >
+            Stats
+          </button>
+        )}
       </div>
     </header>
   );

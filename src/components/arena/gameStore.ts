@@ -1,18 +1,20 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
+import { initialInteractables } from "../../game/data";
+import { aggregateStats, initialCombatStats } from "../../game/analytics";
 import {
   getDistance,
   getLastQueuedPos,
   getSimulatedResources,
+  isCellInteractableWall,
   isCellOccupiedByEnemy,
   isCellWall,
 } from "./selectors";
-import type {
-  Action,
+import type { Action,
   CombatEvent,
   EntityState,
   TurnState,
-} from "../../game/types";
+  TurnStats } from "../../game/types";
 import type { ActiveCommand, GameState } from "./types";
 
 type GameStore = GameState & {
@@ -42,7 +44,15 @@ type GameStore = GameState & {
     queue: Array<Action>,
     turnState: TurnState,
   ) => Promise<void>;
+  setTurnTimer: (time: number) => void;
+  requestSkip: () => void;
+  updateInteractables: (interactables: GameState["server"]["interactables"]) => void;
+  updateCombatStats: (turnStats: TurnStats) => void;
+  toggleStatsOverlay: () => void;
+  resetCombatStats: () => void;
 };
+
+const TURN_TIMER_MAX = 60; // 60 seconds per turn
 
 export const useGameStore = create<GameStore>()(
   immer((set, get) => ({
@@ -60,6 +70,7 @@ export const useGameStore = create<GameStore>()(
         maxMana: 0,
         pos: { x: 0, y: 0 },
         passives: [],
+        loadout: [],
       },
       enemy: {
         id: "enemy",
@@ -73,11 +84,15 @@ export const useGameStore = create<GameStore>()(
         maxMana: 0,
         pos: { x: 0, y: 0 },
         passives: [],
+        loadout: [],
       },
       actionQueue: [],
       cooldowns: {},
       usesThisTurn: {},
       persistentBuffs: { flowStateRange: 0, bonusPa: 0 },
+      interactables: [],
+      turnNumber: 0,
+      skipRequested: false,
     },
     ui: {
       phase: "planning",
@@ -85,20 +100,28 @@ export const useGameStore = create<GameStore>()(
       hoveredCell: null,
       logs: ["System online. Select a command to begin sequence."],
       visualEffects: [],
+      turnTimer: TURN_TIMER_MAX,
+      turnTimerMax: TURN_TIMER_MAX,
+      showStats: false,
+      combatStats: initialCombatStats,
     },
 
     initializeGame: (player, enemy, initialLogs) =>
       set((state) => {
-        state.server.player = player;
-        state.server.enemy = enemy;
+        state.server.player = { ...player, loadout: player.loadout || [] };
+        state.server.enemy = { ...enemy, loadout: enemy.loadout || [] };
         state.server.actionQueue = [];
         state.server.cooldowns = {};
         state.server.usesThisTurn = {};
         state.server.persistentBuffs = { flowStateRange: 0, bonusPa: 0 };
+        state.server.interactables = [...initialInteractables];
+        state.server.turnNumber = 0;
+        state.server.skipRequested = false;
         state.ui.phase = "planning";
         state.ui.activeCommand = null;
         state.ui.hoveredCell = null;
         state.ui.visualEffects = [];
+        state.ui.turnTimer = TURN_TIMER_MAX;
         state.ui.logs = initialLogs ?? [
           "System online. Select a command to begin sequence.",
         ];
@@ -125,6 +148,7 @@ export const useGameStore = create<GameStore>()(
         const dist = getDistance(lastPos, cell);
         const isOccupiedByEnemy = isCellOccupiedByEnemy(state, cell);
         const isWall = isCellWall(cell);
+        const isInteractableWall = isCellInteractableWall(state, cell);
 
         const simStats = getSimulatedResources(state);
 
@@ -133,7 +157,8 @@ export const useGameStore = create<GameStore>()(
             dist > 0 &&
             dist <= simStats.pm &&
             !isOccupiedByEnemy &&
-            !isWall
+            !isWall &&
+            !isInteractableWall
           ) {
             state.server.actionQueue.push({
               type: "move",
@@ -190,7 +215,9 @@ export const useGameStore = create<GameStore>()(
           return;
         }
 
-        if (!(dist <= effectiveRange && (!isWall || ability.type === "buff"))) {
+        if (
+          !(dist <= effectiveRange && (!isWall && !isInteractableWall || ability.type === "buff"))
+        ) {
           state.ui.logs = [
             `Target out of range for ${ability.name}.`,
             ...state.ui.logs,
@@ -208,7 +235,7 @@ export const useGameStore = create<GameStore>()(
           return;
         }
 
-        if (ability.type === "move_attack" && (isOccupiedByEnemy || isWall)) {
+        if (ability.type === "move_attack" && (isOccupiedByEnemy || isWall || isInteractableWall)) {
           state.ui.logs = [
             "Cannot leap onto occupied cell.",
             ...state.ui.logs,
@@ -246,6 +273,7 @@ export const useGameStore = create<GameStore>()(
         state.ui.phase = "resolving";
         state.ui.activeCommand = null;
         state.ui.hoveredCell = null;
+        state.ui.turnTimer = TURN_TIMER_MAX;
       }),
 
     applyEvent: (event, effectId) =>
@@ -282,6 +310,19 @@ export const useGameStore = create<GameStore>()(
           return;
         }
 
+        if (event.type === "rest_triggered") {
+          state.ui.logs = [
+            "> REST BONUS: +1 PA for next turn",
+            ...state.ui.logs,
+          ].slice(0, 15);
+          return;
+        }
+
+        if (event.type === "interact") {
+          // Handle interactable events (mana wells, etc.)
+          return;
+        }
+
         const entity = event.entity;
         if (entity === "player") {
           if (event.hp !== undefined) state.server.player.hp = event.hp;
@@ -313,8 +354,11 @@ export const useGameStore = create<GameStore>()(
           flowStateRange: nextTurnState.flowStateRange,
           bonusPa: nextTurnState.bonusPa,
         };
+        state.server.turnNumber += 1;
+        state.server.skipRequested = false;
         state.ui.phase = "planning";
         state.ui.activeCommand = null;
+        state.ui.turnTimer = TURN_TIMER_MAX;
       }),
 
     runTurnResolution: async (player, enemy, queue, turnState) => {
@@ -327,12 +371,23 @@ export const useGameStore = create<GameStore>()(
 
       const { resolveTurn } = await import("../../game/engine");
 
-      const { events, nextTurnState } = resolveTurn(
+      const state = get();
+      const isRestTurn = state.server.skipRequested;
+      const skipRequested = state.server.skipRequested;
+
+      const { events, nextTurnState, interactables } = resolveTurn(
         player,
         enemy,
         queue,
         turnState,
+        { interactables: state.server.interactables, isRestTurn, skipRequested },
       );
+
+      // Update interactables in store
+      set((s) => {
+        s.server.interactables = interactables;
+      });
+
       let effectId = 1;
 
       for (const event of events) {
@@ -352,5 +407,42 @@ export const useGameStore = create<GameStore>()(
 
       finishTurn(nextTurnState);
     },
+
+    setTurnTimer: (time) =>
+      set((state) => {
+        state.ui.turnTimer = Math.max(0, time);
+      }),
+
+    requestSkip: () =>
+      set((state) => {
+        state.server.skipRequested = true;
+        state.ui.logs = [
+          "> SKIP REQUESTED: Rest bonus (+1 PA) will apply next turn",
+          ...state.ui.logs,
+        ].slice(0, 15);
+      }),
+
+    updateInteractables: (interactables) =>
+      set((state) => {
+        state.server.interactables = interactables;
+      }),
+
+    updateCombatStats: (turnStats) =>
+      set((state) => {
+        state.ui.combatStats = aggregateStats(
+          state.ui.combatStats,
+          turnStats,
+        );
+      }),
+
+    toggleStatsOverlay: () =>
+      set((state) => {
+        state.ui.showStats = !state.ui.showStats;
+      }),
+
+    resetCombatStats: () =>
+      set((state) => {
+        state.ui.combatStats = initialCombatStats;
+      }),
   })),
 );

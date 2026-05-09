@@ -1,6 +1,6 @@
-import type { Ability, Action, EntityState } from "../../game/types";
+import type { Ability, Action, CombatStats, EntityState, Interactable } from "../../game/types";
 
-export type ArenaPhase = "planning" | "resolving" | "playback";
+export type ArenaPhase = "drafting" | "planning" | "resolving" | "playback";
 
 export type ActiveCommand =
   | { type: "move" }
@@ -25,6 +25,9 @@ export type GameServerState = {
     flowStateRange: number;
     bonusPa: number;
   };
+  interactables: Array<Interactable>;
+  turnNumber: number;
+  skipRequested: boolean;
 };
 
 export type GameUiState = {
@@ -33,6 +36,10 @@ export type GameUiState = {
   hoveredCell: { x: number; y: number } | null;
   logs: Array<string>;
   visualEffects: Array<VisualEffect>;
+  turnTimer: number;
+  turnTimerMax: number;
+  showStats: boolean;
+  combatStats: CombatStats;
 };
 
 export type GameState = {
