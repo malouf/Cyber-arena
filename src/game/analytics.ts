@@ -15,6 +15,7 @@ export function calculateTurnStats(
     actionsExecuted: 0,
     distanceMoved: 0,
     damageMitigated: 0,
+    abilityBreakdown: {},
   };
 
   let prevMana: number | null = null;
@@ -60,6 +61,26 @@ export function calculateTurnStats(
             stats.distanceMoved += dist;
           }
           prevPos = event.pos;
+        }
+        break;
+
+      case "mitigation":
+        if (event.entity === entityId) {
+          stats.damageMitigated += event.amount;
+        }
+        break;
+
+      case "healing":
+        if (event.entity === entityId) {
+          stats.healingDone += event.amount;
+        }
+        break;
+
+      case "attack":
+        if (event.entity === entityId && event.hit) {
+          const abilityName = event.abilityName || "Basic Attack";
+          stats.abilityBreakdown[abilityName] =
+            (stats.abilityBreakdown[abilityName] || 0) + event.damage;
         }
         break;
 
@@ -115,7 +136,16 @@ export function aggregateStats(
     turnCount: previous.turnCount + 1,
     dps: 0,
     effectiveDamage: 0,
+    abilityBreakdown: { ...previous.abilityBreakdown },
   };
+
+  // Aggregate ability breakdown
+  for (const [abilityId, damage] of Object.entries(
+    turnStats.abilityBreakdown,
+  )) {
+    newTotal.abilityBreakdown[abilityId] =
+      (newTotal.abilityBreakdown[abilityId] || 0) + damage;
+  }
 
   // Calculate DPS (damage per turn)
   if (newTotal.turnCount > 0) {
@@ -140,6 +170,7 @@ export const initialCombatStats: CombatStats = {
   turnCount: 0,
   dps: 0,
   effectiveDamage: 0,
+  abilityBreakdown: {},
 };
 
 /**

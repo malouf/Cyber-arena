@@ -147,6 +147,73 @@ export function StatsOverlay() {
           </div>
         </div>
 
+        {/* Detailed Ability Breakdown */}
+        <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-8 pt-8 border-t border-neutral-900">
+          <div>
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-white mb-4">
+              Player Ability Breakdown
+            </h3>
+            <div className="space-y-3">
+              {Object.entries(playerStats.abilityBreakdown).length > 0 ? (
+                Object.entries(playerStats.abilityBreakdown)
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([abilityId, damage]) => (
+                    <div key={abilityId} className="space-y-1">
+                      <div className="flex justify-between text-[10px] uppercase font-bold">
+                        <span className="text-neutral-400">{abilityId}</span>
+                        <span className="text-white">{damage} DMG</span>
+                      </div>
+                      <div className="w-full h-1 bg-neutral-900 overflow-hidden">
+                        <div
+                          className="h-full bg-white transition-all duration-1000"
+                          style={{
+                            width: `${(damage / (playerStats.totalDamageDealt || 1)) * 100}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))
+              ) : (
+                <p className="text-[10px] text-neutral-600 italic">
+                  No offensive data recorded.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-4">
+              Enemy Ability Breakdown
+            </h3>
+            <div className="space-y-3">
+              {Object.entries(enemyStats.abilityBreakdown).length > 0 ? (
+                Object.entries(enemyStats.abilityBreakdown)
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([abilityId, damage]) => (
+                    <div key={abilityId} className="space-y-1">
+                      <div className="flex justify-between text-[10px] uppercase font-bold">
+                        <span className="text-neutral-400">{abilityId}</span>
+                        <span className="text-red-500">{damage} DMG</span>
+                      </div>
+                      <div className="w-full h-1 bg-neutral-900 overflow-hidden">
+                        <div
+                          className="h-full bg-red-600 transition-all duration-1000"
+                          style={{
+                            width: `${(damage / (enemyStats.totalDamageDealt || 1)) * 100}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))
+              ) : (
+                <p className="text-[10px] text-neutral-600 italic">
+                  No offensive data recorded.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Effective Comparison */}
         <div className="mt-12 p-6 border border-neutral-900 bg-neutral-900/30 flex flex-col md:flex-row justify-between items-center gap-8">
           <div className="flex-1 w-full">

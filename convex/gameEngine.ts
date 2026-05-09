@@ -6,16 +6,54 @@ export type EntityState = Doc<"matches">["players"][number]["state"];
 export type ValidatedAction = Doc<"turnSubmissions">["queue"][number];
 export type CombatEvent = Doc<"matchEvents">["events"][number];
 
-export type TurnState = {
-  cooldowns: Record<string, number>;
-  usesThisTurn: Record<string, number>;
-  // Add other transient states if needed
-};
-
 export function getDistance(c1: Pos, c2: Pos) {
   const dx = c2.x - c1.x;
   const dy = c2.y - c1.y;
   return Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dx + dy));
+}
+
+function processPassives(
+  actor: any,
+  target: any,
+  action: ValidatedAction,
+  damage: number,
+  events: Array<CombatEvent>,
+): { damage: number; mitigation: number } {
+  let finalDamage = damage;
+  let mitigation = 0;
+
+  // Mitigation passives on target
+  if (target.state.passives.includes("heavy_plating")) {
+    const reduced = Math.min(finalDamage, 3);
+    finalDamage -= reduced;
+    mitigation += reduced;
+    events.push({
+      type: "mitigation",
+      entity: target.slot,
+      amount: reduced,
+      source: "Heavy Plating",
+    });
+  }
+
+  // Reflect/Thorns passives
+  if (target.state.passives.includes("thorns") && action.range === 1) {
+    const reflectDamage = 5;
+    actor.state.hp -= reflectDamage;
+    events.push({
+      type: "effect",
+      pos: actor.state.pos,
+      text: `Thorns: -${reflectDamage}`,
+      color: "text-red-400",
+    });
+  }
+
+  // Offensive passives on actor
+  if (actor.state.passives.includes("momentum")) {
+    // This would require tracking distance moved this turn, simplified for now
+    // In a real implementation, you'd check actor.state.distanceMovedThisTurn
+  }
+
+  return { damage: finalDamage, mitigation };
 }
 
 export function resolveMatchTurn(
@@ -40,6 +78,8 @@ export function resolveMatchTurn(
       damageTaken: 0,
       healingDone: 0,
       shieldingDone: 0,
+      damageMitigated: 0,
+      resourceEfficiency: 0,
       interrupts: 0,
       abilityBreakdown: {},
     };
@@ -70,6 +110,9 @@ export function resolveMatchTurn(
       const actor = getPlayerBySlot(slot);
       if (actor.state.hp <= 0) continue;
 
+      // Track resource usage for efficiency
+      const totalCost = action.paCost + action.pmCost + action.manaCost * 2;
+
       if (action.type === "move") {
         actor.state.pm -= action.pmCost;
         actor.state.pa -= action.paCost;
@@ -92,10 +135,18 @@ export function resolveMatchTurn(
         if (pickup) {
           pickup.collected = true;
           if (pickup.type === "hp") {
-            actor.state.hp = Math.min(
-              actor.state.maxHp,
-              actor.state.hp + pickup.value,
+            const healAmount = Math.min(
+              actor.state.maxHp - actor.state.hp,
+              pickup.value,
             );
+            actor.state.hp += healAmount;
+            analytics[slot].healingDone += healAmount;
+            events.push({
+              type: "healing",
+              entity: slot,
+              amount: healAmount,
+              source: "HP Pickup",
+            });
             events.push({
               type: "log",
               text: `${actor.name} picked up HP! (+${pickup.value})`,
@@ -105,6 +156,13 @@ export function resolveMatchTurn(
               actor.state.maxMana,
               actor.state.mana + pickup.value,
             );
+            events.push({
+              type: "resource_change",
+              entity: slot,
+              resource: "mana",
+              amount: pickup.value,
+              reason: "Mana Pickup",
+            });
             events.push({
               type: "log",
               text: `${actor.name} picked up Mana! (+${pickup.value})`,
@@ -134,58 +192,101 @@ export function resolveMatchTurn(
         );
 
         const dist = getDistance(actor.state.pos, targetPos);
-        const hit =
-          dist <= action.range &&
-          (targetPlayer !== undefined || action.range === 0); // range 0 is self
+        const abilityType = action.abilityType || "attack";
 
-        if (hit && targetPlayer) {
-          let damage = action.damage;
-          // Apply passives/modifiers
-          if (targetPlayer.state.passives.includes("heavy_plating")) {
-            damage = Math.max(0, damage - 3);
+        // Dispatch by type
+        if (abilityType === "attack" || abilityType === "move_attack") {
+          const hit = dist <= action.range && targetPlayer !== undefined;
+
+          if (hit && targetPlayer) {
+            const { damage, mitigation } = processPassives(
+              actor,
+              targetPlayer,
+              action,
+              action.damage,
+              events,
+            );
+
+            targetPlayer.state.hp -= damage;
+
+            // Update analytics
+            analytics[slot].damageDealt += damage;
+            analytics[targetPlayer.slot].damageTaken += damage;
+            analytics[targetPlayer.slot].damageMitigated += mitigation;
+
+            if (totalCost > 0) {
+              analytics[slot].resourceEfficiency =
+                analytics[slot].damageDealt /
+                (actor.state.maxPa -
+                  actor.state.pa +
+                  (actor.state.maxMana - actor.state.mana) * 5);
+            }
+
+            const abilityId = action.abilityId || action.name;
+            analytics[slot].abilityBreakdown[abilityId] =
+              (analytics[slot].abilityBreakdown[abilityId] || 0) + damage;
+
+            events.push({
+              type: "attack",
+              entity: slot,
+              target: targetPos,
+              hit: true,
+              damage: damage,
+              abilityName: action.name,
+            });
+            events.push({
+              type: "effect",
+              pos: targetPos,
+              text: `-${damage}`,
+              color: "text-red-500",
+            });
+            events.push({
+              type: "stats",
+              entity: targetPlayer.slot,
+              hp: targetPlayer.state.hp,
+            });
+          } else {
+            events.push({
+              type: "attack",
+              entity: slot,
+              target: targetPos,
+              hit: false,
+              damage: 0,
+              abilityName: action.name,
+            });
           }
-
-          targetPlayer.state.hp -= damage;
-
-          // Update analytics
-          analytics[slot].damageDealt += damage;
-          analytics[targetPlayer.slot].damageTaken += damage;
-          const abilityId = action.abilityId || action.name;
-          analytics[slot].abilityBreakdown[abilityId] =
-            (analytics[slot].abilityBreakdown[abilityId] || 0) + damage;
-
-          events.push({
-            type: "attack",
-            entity: slot,
-            target: targetPos,
-            hit: true,
-            damage: damage,
-            abilityName: action.name,
-          });
-          events.push({
-            type: "effect",
-            pos: targetPos,
-            text: `-${damage}`,
-            color: "text-red-500",
-          });
-          events.push({
-            type: "stats",
-            entity: targetPlayer.slot,
-            hp: targetPlayer.state.hp,
-          });
-        } else {
-          events.push({
-            type: "attack",
-            entity: slot,
-            target: targetPos,
-            hit: false,
-            damage: 0,
-            abilityName: action.name,
-          });
+        } else if (abilityType === "buff") {
+          // Handle self-buffs or ally buffs
+          if (action.name === "Fortify") {
+            const shieldAmount = 20;
+            // Simplified shielding logic: add to HP for now or track separately
+            actor.state.hp = Math.min(
+              actor.state.maxHp + shieldAmount,
+              actor.state.hp + shieldAmount,
+            );
+            analytics[slot].shieldingDone += shieldAmount;
+            events.push({
+              type: "effect",
+              pos: actor.state.pos,
+              text: "SHIELDED",
+              color: "text-blue-400",
+            });
+          }
+        } else if (abilityType === "control") {
+          if (targetPlayer) {
+            // Simplified Magnetic Pull: move target to actor's adjacent cell
+            // In a real implementation, you'd calculate the correct cell
+            events.push({
+              type: "log",
+              text: `${actor.name} pulled ${targetPlayer.name}!`,
+            });
+          }
+        } else if (abilityType === "trap") {
           events.push({
             type: "log",
-            text: `${actor.name}'s ${action.name} missed!`,
+            text: `${actor.name} placed a ${action.name}!`,
           });
+          // Logic to add to currentMapObjects could go here
         }
 
         events.push({

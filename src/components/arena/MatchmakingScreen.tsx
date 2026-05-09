@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { DraftPhase } from "./DraftPhase";
+import type { PlayerBuild } from "./DraftPhase";
 
 type Props = {
   clientId: string;
@@ -11,12 +13,14 @@ type Props = {
 export function MatchmakingScreen({ clientId }: Props) {
   const queueForMatch = useMutation(api.matches.queueForMatch);
   const leaveQueue = useMutation(api.matches.leaveQueue);
-  
+
   const [displayName, setDisplayName] = useState("");
   const [isQueueing, setIsQueueing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isInQueue, setIsInQueue] = useState(false);
-  
+  const [showDraft, setShowDraft] = useState(false);
+  const [selectedBuild, setSelectedBuild] = useState<PlayerBuild | null>(null);
+
   useEffect(() => {
     const existing = window.localStorage.getItem("arena_async_display_name");
     if (existing) {
@@ -25,26 +29,36 @@ export function MatchmakingScreen({ clientId }: Props) {
     }
     setDisplayName(`Pilot-${clientId.slice(0, 4)}`);
   }, [clientId]);
-  
+
   const normalizedName = displayName.trim() || `Pilot-${clientId.slice(0, 4)}`;
-  
-  const handleQueue = async () => {
+
+  const handleQueue = async (build: PlayerBuild) => {
     setErrorMessage(null);
     setIsQueueing(true);
     try {
       window.localStorage.setItem("arena_async_display_name", normalizedName);
+
+      // Transform build to match Convex validator
+      const slots = build.loadout.map((slot) => {
+        if (slot.kind === "passive") {
+          return { kind: "passive" as const, passiveId: slot.passive.id };
+        } else {
+          return { kind: slot.kind, abilityId: slot.ability.id };
+        }
+      });
+
       await queueForMatch({
         clientId,
         displayName: normalizedName,
-        primarySoul: "onde",
-        secondarySoul: "fury",
-        selectedActives: ["impulse", "stasis", "leap"],
-        selectedPassives: ["drain_force", "masochism"],
+        primarySoul: build.primary,
+        secondarySoul: build.secondary,
+        slots: slots,
         items: [],
         mode: "1v1",
         type: "casual",
       });
       setIsInQueue(true);
+      setShowDraft(false);
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Unable to queue.",
@@ -53,7 +67,7 @@ export function MatchmakingScreen({ clientId }: Props) {
       setIsQueueing(false);
     }
   };
-  
+
   const handleLeaveQueue = async () => {
     setErrorMessage(null);
     setIsQueueing(true);
@@ -68,7 +82,11 @@ export function MatchmakingScreen({ clientId }: Props) {
       setIsQueueing(false);
     }
   };
-  
+
+  if (showDraft) {
+    return <DraftPhase onComplete={(build) => handleQueue(build)} />;
+  }
+
   return (
     <main className="min-h-screen bg-black text-neutral-100 font-sans p-6 md:p-10">
       <div className="mx-auto w-full max-w-3xl space-y-6">
@@ -125,11 +143,11 @@ export function MatchmakingScreen({ clientId }: Props) {
             </div>
           ) : (
             <button
-              onClick={handleQueue}
+              onClick={() => setShowDraft(true)}
               disabled={isQueueing}
               className="w-full bg-white text-black py-3 text-xs font-black uppercase tracking-[0.25em] hover:bg-red-600 hover:text-white disabled:opacity-50"
             >
-              {isQueueing ? "Connecting..." : "Find Match"}
+              {isQueueing ? "Connecting..." : "Select Soul & Find Match"}
             </button>
           )}
 

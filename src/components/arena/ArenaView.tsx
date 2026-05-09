@@ -63,10 +63,11 @@ export function ArenaView({ build, matchMode, onAbort, onPhaseChange }: Props) {
   const turnNumber = useGameStore((s) => s.server.turnNumber);
 
   // Sync with server state in multiplayer mode
-  const { latestEvents: _unusedEvents, status, winner } = useMatchSync(
-    matchMode?.matchId ?? null,
-    matchMode?.clientId ?? null,
-  );
+  const {
+    latestEvents: _unusedEvents,
+    status,
+    winner,
+  } = useMatchSync(matchMode?.matchId ?? null, matchMode?.clientId ?? null);
   void _unusedEvents; // TODO: use for event playback
 
   // Extract passive IDs from loadout for local mode
@@ -121,43 +122,27 @@ export function ArenaView({ build, matchMode, onAbort, onPhaseChange }: Props) {
   ) => {
     setActiveCommand(command);
   };
-  
+
   // Multiplayer: handle cell click from queue
   const handleCellClickMultiplayer = (
     cell: { x: number; y: number },
-    commandType: "move" | "ability" | null,
+    command: { type: "move" } | { type: "ability"; ability: Ability } | null,
   ) => {
-    if (!commandType || !matchMode || pendingSubmit) return;
+    if (!command || !matchMode || pendingSubmit) return;
     if (queue.length >= 6) return;
-    
-    const action = commandType === "move"
-      ? { type: "move" as const, target: cell }
-      : { type: "ability" as const, target: cell };
-    
+
+    const action =
+      command.type === "move"
+        ? { type: "move" as const, target: cell }
+        : {
+            type: "ability" as const,
+            target: cell,
+            abilityId: command.ability.id,
+          };
+
     useMultiplayerStore.getState().addToQueue(action);
+    handleSetActiveCommand(null);
   };
-  
-  // Multiplayer: submit turn
-  const handleSubmitTurn = async () => {
-    if (!matchMode || queue.length === 0 || pendingSubmit) return;
-    
-    setPendingSubmit(true);
-    try {
-      await submitTurn({
-        matchId: matchMode.matchId,
-        clientId: matchMode.clientId,
-        turnNumber,
-        queue,
-      });
-      clearQueue();
-    } catch (error) {
-      console.error("Turn submission failed:", error);
-      setPendingSubmit(false);
-    }
-  };
-  
-  // Sync active command state for multiplayer
-  const [selectedCommandType, setSelectedCommandType] = useState<"move" | "ability" | null>(null);
 
   return (
     <main className="min-h-screen bg-black text-neutral-100 flex flex-col font-sans overflow-hidden">
@@ -179,46 +164,34 @@ export function ArenaView({ build, matchMode, onAbort, onPhaseChange }: Props) {
           buildPassives={passiveIds}
           interactables={interactables}
           onCellClick={
-            matchMode && selectedCommandType
-              ? (cell) => handleCellClickMultiplayer(cell, selectedCommandType)
+            matchMode && activeCommand
+              ? (cell) => handleCellClickMultiplayer(cell, activeCommand)
               : undefined
           }
         />
 
         <div className="w-full lg:w-[400px] flex flex-col gap-4">
-          {/* Multiplayer: Command Selection */}
+          {/* Multiplayer: Queue Control */}
           {matchMode && (
             <section className="border border-neutral-900 bg-neutral-950 p-4 space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => setSelectedCommandType("move")}
-                  disabled={pendingSubmit}
-                  className={`py-2 border text-xs uppercase tracking-widest transition-colors ${
-                    selectedCommandType === "move"
-                      ? "border-white bg-white text-black"
-                      : "border-neutral-700 hover:border-white"
-                  } disabled:opacity-40`}
-                >
-                  Move
-                </button>
-                <button
-                  onClick={() => setSelectedCommandType("ability")}
-                  disabled={pendingSubmit}
-                  className={`py-2 border text-xs uppercase tracking-widest transition-colors ${
-                    selectedCommandType === "ability"
-                      ? "border-red-600 bg-red-600/20 text-red-300"
-                      : "border-neutral-700 hover:border-red-500"
-                  } disabled:opacity-40`}
-                >
-                  Basic Attack
-                </button>
-              </div>
-              
+              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-600 flex justify-between">
+                <span>Multiplayer Queue</span>
+                {activeCommand && (
+                  <span className="text-red-500 animate-pulse">
+                    Select target for{" "}
+                    {activeCommand.type === "ability"
+                      ? activeCommand.ability.name
+                      : "Move"}
+                  </span>
+                )}
+              </h3>
+
               {/* Queue Display */}
               <div className="space-y-2 max-h-32 overflow-auto pr-1">
                 {queue.length === 0 ? (
                   <p className="text-[11px] text-neutral-600">
-                    Select a command, then click on the grid to queue actions.
+                    Select a command from the panel below, then click on the
+                    grid to queue actions.
                   </p>
                 ) : (
                   queue.map((action, index) => (
@@ -227,10 +200,14 @@ export function ArenaView({ build, matchMode, onAbort, onPhaseChange }: Props) {
                       className="text-[11px] font-mono border border-neutral-800 p-2 flex justify-between items-center"
                     >
                       <span>
-                        {index + 1}. {action.type.toUpperCase()} → [{action.target.x},{action.target.y}]
+                        {index + 1}. {action.type.toUpperCase()}{" "}
+                        {action.abilityId ? `(${action.abilityId})` : ""} → [
+                        {action.target.x},{action.target.y}]
                       </span>
                       <button
-                        onClick={() => useMultiplayerStore.getState().removeFromQueue(index)}
+                        onClick={() =>
+                          useMultiplayerStore.getState().removeFromQueue(index)
+                        }
                         className="text-neutral-500 hover:text-white text-xs ml-2"
                       >
                         ✕
@@ -239,7 +216,7 @@ export function ArenaView({ build, matchMode, onAbort, onPhaseChange }: Props) {
                   ))
                 )}
               </div>
-              
+
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={clearQueue}
@@ -256,7 +233,7 @@ export function ArenaView({ build, matchMode, onAbort, onPhaseChange }: Props) {
                   {pendingSubmit ? "Submitting..." : "Commit"}
                 </button>
               </div>
-              
+
               {pendingSubmit && (
                 <p className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 text-center">
                   Waiting for opponent...
@@ -264,14 +241,18 @@ export function ArenaView({ build, matchMode, onAbort, onPhaseChange }: Props) {
               )}
             </section>
           )}
-          
+
           <CommandPanel
             activeCommand={activeCommand}
             setActiveCommand={handleSetActiveCommand}
             simStats={simStats}
-            loadout={build?.loadout ?? []}
+            loadout={
+              player.loadout.length > 0
+                ? player.loadout
+                : (build?.loadout ?? [])
+            }
             cooldowns={cooldowns}
-            disabled={isResolving || !!matchMode}
+            disabled={isResolving || (!!matchMode && pendingSubmit)}
           />
           <SequencePanel />
         </div>
@@ -288,7 +269,11 @@ export function ArenaView({ build, matchMode, onAbort, onPhaseChange }: Props) {
               Match Complete
             </h2>
             <p className="text-lg text-white">
-              {winner === "player" ? "Victory!" : winner === "enemy" ? "Defeat" : "Draw"}
+              {winner === "player"
+                ? "Victory!"
+                : winner === "enemy"
+                  ? "Defeat"
+                  : "Draw"}
             </p>
             <button
               onClick={onAbort}

@@ -115,6 +115,14 @@ export type CombatEvent =
       pm?: number;
       mana?: number;
     }
+  | {
+      type: "attack";
+      entity: "player" | "enemy";
+      target: Pos;
+      hit: boolean;
+      damage: number;
+      abilityName?: string;
+    }
   | { type: "delay"; ms: number }
   | {
       type: "interact";
@@ -122,7 +130,26 @@ export type CombatEvent =
       interactableId: string;
       interactableType: InteractableType;
     }
-  | { type: "rest_triggered"; entity: "player" | "enemy" };
+  | { type: "rest_triggered"; entity: "player" | "enemy" }
+  | {
+      type: "mitigation";
+      entity: "player" | "enemy";
+      amount: number;
+      source: string;
+    }
+  | {
+      type: "healing";
+      entity: "player" | "enemy";
+      amount: number;
+      source: string;
+    }
+  | {
+      type: "resource_change";
+      entity: "player" | "enemy";
+      resource: "pa" | "pm" | "mana";
+      amount: number;
+      reason: string;
+    };
 
 export type TurnState = {
   cooldowns: Record<string, number>;
@@ -140,6 +167,7 @@ export type TurnStats = {
   actionsExecuted: number;
   distanceMoved: number;
   damageMitigated: number;
+  abilityBreakdown: Record<string, number>;
 };
 
 export type CombatStats = {
@@ -153,4 +181,5 @@ export type CombatStats = {
   turnCount: number;
   dps: number;
   effectiveDamage: number;
+  abilityBreakdown: Record<string, number>;
 };
