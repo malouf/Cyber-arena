@@ -1,8 +1,10 @@
 import { useGameStore } from "./gameStore";
-import { selectCombatStats } from "./selectors";
+import { selectCombatStats, selectEnemyCombatStats } from "./selectors";
+import type { CombatStats } from "../../game/types";
 
 export function StatsOverlay() {
-  const combatStats = useGameStore(selectCombatStats);
+  const playerStats = useGameStore(selectCombatStats);
+  const enemyStats = useGameStore(selectEnemyCombatStats);
   const toggleStatsOverlay = useGameStore((s) => s.toggleStatsOverlay);
   const resetCombatStats = useGameStore((s) => s.resetCombatStats);
 
@@ -10,168 +12,215 @@ export function StatsOverlay() {
     return n.toFixed(decimals);
   };
 
-  const mitigationPct =
-    combatStats.totalDamageTaken + combatStats.totalDamageMitigated > 0
+  const getMitigationPct = (stats: CombatStats) =>
+    stats.totalDamageTaken + stats.totalDamageMitigated > 0
       ? (
-          (combatStats.totalDamageMitigated /
-            (combatStats.totalDamageTaken + combatStats.totalDamageMitigated)) *
+          (stats.totalDamageMitigated /
+            (stats.totalDamageTaken + stats.totalDamageMitigated)) *
           100
         ).toFixed(1)
       : "0.0";
 
-  const damagePerAction =
-    combatStats.totalActionsExecuted > 0
-      ? (combatStats.totalDamageDealt / combatStats.totalActionsExecuted).toFixed(
-          1,
-        )
-      : "0.0";
-
   return (
-    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-8">
-      <div className="bg-neutral-950 border border-neutral-800 p-6 max-w-lg w-full">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-lg font-black uppercase tracking-widest text-white">
-            Combat Analytics
-          </h2>
-          <div className="flex gap-2">
+    <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 md:p-8 backdrop-blur-sm">
+      <div className="bg-neutral-950 border border-neutral-800 p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-8 pb-4 border-b border-neutral-900">
+          <div>
+            <h2 className="text-xl font-black uppercase tracking-tighter text-white">
+              Tactical Analytics
+            </h2>
+            <p className="text-[10px] text-neutral-500 uppercase tracking-widest mt-1">
+              Sequence performance report - Turn {playerStats.turnCount}
+            </p>
+          </div>
+          <div className="flex gap-3">
             <button
               onClick={resetCombatStats}
-              className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest border border-neutral-700 bg-neutral-900 text-neutral-400 hover:text-white hover:border-neutral-500 transition-colors"
+              className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest border border-neutral-800 bg-neutral-900 text-neutral-500 hover:text-white hover:border-neutral-600 transition-all"
             >
-              Reset
+              Reset Data
             </button>
             <button
               onClick={toggleStatsOverlay}
-              className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest border border-neutral-700 bg-neutral-900 text-neutral-400 hover:text-white transition-colors"
+              className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest border border-neutral-700 bg-white text-black hover:bg-neutral-200 transition-all"
             >
               Close
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          {/* DPS */}
-          <div className="col-span-2 border border-neutral-900 p-4 bg-neutral-900/50">
-            <div className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest mb-1">
-              Damage Per Second (DPS)
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Player Column */}
+          <div className="space-y-6">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-2 h-2 bg-white" />
+              <h3 className="text-xs font-black uppercase tracking-widest text-white">
+                Subject: Player
+              </h3>
             </div>
-            <div className="text-3xl font-black text-white">
-              {formatNumber(combatStats.dps)}
+
+            <StatCard
+              label="Damage Output"
+              value={playerStats.totalDamageDealt}
+              subValue={`${formatNumber(playerStats.dps)} per turn`}
+              color="text-white"
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <StatCard
+                label="Damage Taken"
+                value={playerStats.totalDamageTaken}
+                subValue={`${playerStats.totalDamageMitigated} mitigated (${getMitigationPct(playerStats)}%)`}
+                compact
+              />
+              <StatCard
+                label="Mana Efficiency"
+                value={playerStats.totalManaSpent}
+                subValue={`${playerStats.totalManaSpent > 0 ? formatNumber(playerStats.totalDamageDealt / playerStats.totalManaSpent) : "0.0"} dmg/mana`}
+                compact
+                color="text-blue-400"
+              />
             </div>
-            <div className="text-[9px] text-neutral-500 mt-1">
-              Based on {combatStats.turnCount} turns
+
+            <div className="grid grid-cols-2 gap-4">
+              <StatCard
+                label="Distance"
+                value={playerStats.totalDistanceMoved}
+                subValue="Cells traveled"
+                compact
+              />
+              <StatCard
+                label="Actions"
+                value={playerStats.totalActionsExecuted}
+                subValue="Combat maneuvers"
+                compact
+              />
             </div>
           </div>
 
-          {/* Damage Dealt */}
-          <div className="border border-neutral-900 p-3">
-            <div className="text-[8px] font-bold text-red-600 uppercase tracking-widest mb-1">
-              Damage Dealt
+          {/* Enemy Column */}
+          <div className="space-y-6">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-2 h-2 bg-red-600" />
+              <h3 className="text-xs font-black uppercase tracking-widest text-red-500">
+                Target: Enemy
+              </h3>
             </div>
-            <div className="text-2xl font-black text-red-400">
-              {combatStats.totalDamageDealt}
-            </div>
-            <div className="text-[9px] text-neutral-500 mt-1">
-              {damagePerAction} per action
-            </div>
-          </div>
 
-          {/* Damage Taken */}
-          <div className="border border-neutral-900 p-3">
-            <div className="text-[8px] font-bold text-neutral-500 uppercase tracking-widest mb-1">
-              Damage Taken
-            </div>
-            <div className="text-2xl font-black text-neutral-300">
-              {combatStats.totalDamageTaken}
-            </div>
-            <div className="text-[9px] text-neutral-500 mt-1">
-              Mitigated: {combatStats.totalDamageMitigated} ({mitigationPct}%)
-            </div>
-          </div>
+            <StatCard
+              label="Damage Output"
+              value={enemyStats.totalDamageDealt}
+              subValue={`${formatNumber(enemyStats.dps)} per turn`}
+              color="text-red-500"
+            />
 
-          {/* Mana Spent */}
-          <div className="border border-neutral-900 p-3">
-            <div className="text-[8px] font-bold text-blue-500 uppercase tracking-widest mb-1">
-              Mana Spent
+            <div className="grid grid-cols-2 gap-4">
+              <StatCard
+                label="Damage Taken"
+                value={enemyStats.totalDamageTaken}
+                subValue={`${enemyStats.totalDamageMitigated} mitigated (${getMitigationPct(enemyStats)}%)`}
+                compact
+              />
+              <StatCard
+                label="Mana Efficiency"
+                value={enemyStats.totalManaSpent}
+                subValue={`${enemyStats.totalManaSpent > 0 ? formatNumber(enemyStats.totalDamageDealt / enemyStats.totalManaSpent) : "0.0"} dmg/mana`}
+                compact
+                color="text-blue-400"
+              />
             </div>
-            <div className="text-2xl font-black text-blue-400">
-              {combatStats.totalManaSpent}
-            </div>
-            <div className="text-[9px] text-neutral-500 mt-1">
-              Efficiency: {combatStats.totalDamageDealt > 0 && combatStats.totalManaSpent > 0
-                ? formatNumber(combatStats.totalDamageDealt / combatStats.totalManaSpent)
-                : "0.0"} dmg/mana
-            </div>
-          </div>
 
-          {/* Actions Executed */}
-          <div className="border border-neutral-900 p-3">
-            <div className="text-[8px] font-bold text-white uppercase tracking-widest mb-1">
-              Actions Executed
-            </div>
-            <div className="text-2xl font-black text-white">
-              {combatStats.totalActionsExecuted}
-            </div>
-            <div className="text-[9px] text-neutral-500 mt-1">
-              Over {combatStats.turnCount} turns
-            </div>
-          </div>
-
-          {/* Distance Moved */}
-          <div className="border border-neutral-900 p-3">
-            <div className="text-[8px] font-bold text-neutral-400 uppercase tracking-widest mb-1">
-              Distance Moved
-            </div>
-            <div className="text-2xl font-black text-neutral-300">
-              {combatStats.totalDistanceMoved}
-            </div>
-            <div className="text-[9px] text-neutral-500 mt-1">
-              Cells traveled
-            </div>
-          </div>
-
-          {/* Healing Done */}
-          <div className="border border-neutral-900 p-3">
-            <div className="text-[8px] font-bold text-green-500 uppercase tracking-widest mb-1">
-              Healing Done
-            </div>
-            <div className="text-2xl font-black text-green-400">
-              {combatStats.totalHealingDone}
-            </div>
-            <div className="text-[9px] text-neutral-500 mt-1">
-              Self/healing effects
+            <div className="grid grid-cols-2 gap-4">
+              <StatCard
+                label="Distance"
+                value={enemyStats.totalDistanceMoved}
+                subValue="Cells traveled"
+                compact
+              />
+              <StatCard
+                label="Actions"
+                value={enemyStats.totalActionsExecuted}
+                subValue="Combat maneuvers"
+                compact
+              />
             </div>
           </div>
         </div>
 
-        {/* Effective Damage Summary */}
-        <div className="mt-4 p-4 border border-red-900/30 bg-red-900/5">
-          <div className="text-[9px] font-bold text-red-500 uppercase tracking-widest mb-2">
-            Effective Damage Output
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-[9px] text-neutral-500">
-              Base Damage + Mitigation Bonus
-            </span>
-            <span className="text-xl font-black text-white">
-              {combatStats.effectiveDamage}
-            </span>
-          </div>
-          <div className="mt-2 flex gap-4">
-            <div>
-              <span className="text-[8px] text-neutral-600">Base: </span>
-              <span className="text-[10px] font-mono text-neutral-400">
-                {combatStats.totalDamageDealt}
-              </span>
+        {/* Effective Comparison */}
+        <div className="mt-12 p-6 border border-neutral-900 bg-neutral-900/30 flex flex-col md:flex-row justify-between items-center gap-8">
+          <div className="flex-1 w-full">
+            <div className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-4">
+              Relative Damage Dominance
             </div>
-            <div>
-              <span className="text-[8px] text-neutral-600">Mitigated: </span>
-              <span className="text-[10px] font-mono text-green-500">
-                +{combatStats.totalDamageMitigated}
+            <div className="w-full h-4 bg-neutral-800 rounded-full overflow-hidden flex">
+              <div
+                className="h-full bg-white transition-all duration-1000"
+                style={{
+                  width: `${(playerStats.totalDamageDealt / (playerStats.totalDamageDealt + enemyStats.totalDamageDealt || 1)) * 100}%`,
+                }}
+              />
+              <div
+                className="h-full bg-red-600 transition-all duration-1000"
+                style={{
+                  width: `${(enemyStats.totalDamageDealt / (playerStats.totalDamageDealt + enemyStats.totalDamageDealt || 1)) * 100}%`,
+                }}
+              />
+            </div>
+            <div className="flex justify-between mt-2">
+              <span className="text-[10px] font-mono text-white">
+                {Math.round(
+                  (playerStats.totalDamageDealt /
+                    (playerStats.totalDamageDealt +
+                      enemyStats.totalDamageDealt || 1)) *
+                    100,
+                )}
+                % Player
+              </span>
+              <span className="text-[10px] font-mono text-red-500">
+                {Math.round(
+                  (enemyStats.totalDamageDealt /
+                    (playerStats.totalDamageDealt +
+                      enemyStats.totalDamageDealt || 1)) *
+                    100,
+                )}
+                % Enemy
               </span>
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  subValue,
+  color = "text-neutral-300",
+  compact = false,
+}: {
+  label: string;
+  value: string | number;
+  subValue: string;
+  color?: string;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={`border border-neutral-900 p-4 bg-black/40 ${compact ? "py-3" : "py-5"}`}
+    >
+      <div className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest mb-1">
+        {label}
+      </div>
+      <div
+        className={`${compact ? "text-xl" : "text-3xl"} font-black ${color}`}
+      >
+        {value}
+      </div>
+      <div className="text-[9px] text-neutral-600 mt-1 uppercase">
+        {subValue}
       </div>
     </div>
   );

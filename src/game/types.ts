@@ -2,6 +2,16 @@ export type SoulId = "onde" | "fury" | "aegis";
 
 export type Pos = { x: number; y: number };
 
+export type StatusEffectType = "stun" | "dot" | "shield" | "buff" | "debuff";
+
+export type StatusEffect = {
+  id: string;
+  type: StatusEffectType;
+  name: string;
+  duration: number; // turns
+  value?: number;
+};
+
 export type Ability = {
   id: string;
   name: string;
@@ -15,13 +25,20 @@ export type Ability = {
   initiative: number;
   cooldown?: number;
   maxUsesPerTurn?: number;
+  effect?: StatusEffect;
 };
 
 export type Passive = {
   id: string;
   name: string;
   desc: string;
-  effect?: "masochism" | "momentum" | "drain_force" | "flow_state" | "thorns" | "heavy_plating";
+  effect?:
+    | "masochism"
+    | "momentum"
+    | "drain_force"
+    | "flow_state"
+    | "thorns"
+    | "heavy_plating";
 };
 
 export type Soul = {
@@ -65,6 +82,7 @@ export type EntityState = {
   pos: Pos;
   passives: Array<string>;
   loadout: Array<LoadoutSlot>;
+  effects: Array<StatusEffect>;
 };
 
 export type InteractableType = "mana_well" | "item" | "trap" | "wall";
@@ -81,7 +99,13 @@ export type Interactable = {
 
 export type CombatEvent =
   | { type: "log"; text: string }
-  | { type: "effect"; text: string; color: string; pos: Pos }
+  | {
+      type: "effect";
+      text: string;
+      color: string;
+      pos: Pos;
+      target?: "player" | "enemy";
+    }
   | { type: "move"; entity: "player" | "enemy"; pos: Pos }
   | {
       type: "stats";
@@ -92,7 +116,12 @@ export type CombatEvent =
       mana?: number;
     }
   | { type: "delay"; ms: number }
-  | { type: "interact"; entity: "player" | "enemy"; interactableId: string; interactableType: InteractableType }
+  | {
+      type: "interact";
+      entity: "player" | "enemy";
+      interactableId: string;
+      interactableType: InteractableType;
+    }
   | { type: "rest_triggered"; entity: "player" | "enemy" };
 
 export type TurnState = {

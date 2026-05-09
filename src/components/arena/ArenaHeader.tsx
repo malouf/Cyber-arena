@@ -124,6 +124,28 @@ export function ArenaHeader({
               </div>
             </div>
           </div>
+          <div className="flex gap-1 mt-2">
+            {playerStats.effects.map((e, i) => (
+              <div
+                key={i}
+                className="text-[7px] px-1.5 py-0.5 bg-white/5 text-white border border-white/10 flex items-center gap-1"
+                title={`${e.type.toUpperCase()}: ${e.value || ""}`}
+              >
+                <div
+                  className={`w-1 h-1 rounded-full ${
+                    e.type === "stun"
+                      ? "bg-amber-500"
+                      : e.type === "dot"
+                        ? "bg-orange-600"
+                        : e.type === "shield"
+                          ? "bg-blue-400"
+                          : "bg-green-500"
+                  }`}
+                />
+                {e.name} <span className="opacity-50">{e.duration}T</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="h-8 w-px bg-neutral-900 hidden md:block" />
@@ -149,6 +171,28 @@ export function ArenaHeader({
                   />
                 ),
               )}
+            </div>
+            <div className="flex gap-1 mt-2 justify-end">
+              {enemyStats.effects.map((e, i) => (
+                <div
+                  key={i}
+                  className="text-[7px] px-1.5 py-0.5 bg-red-500/5 text-red-200 border border-red-500/10 flex items-center gap-1"
+                  title={`${e.type.toUpperCase()}: ${e.value || ""}`}
+                >
+                  <div
+                    className={`w-1 h-1 rounded-full ${
+                      e.type === "stun"
+                        ? "bg-amber-500"
+                        : e.type === "dot"
+                          ? "bg-orange-600"
+                          : e.type === "shield"
+                            ? "bg-blue-400"
+                            : "bg-green-500"
+                    }`}
+                  />
+                  {e.name} <span className="opacity-50">{e.duration}T</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/shallow";
 import { soulData } from "../../game/data";
+import { generateEnemyBuild } from "../../game/ai";
 
 import { ArenaHeader } from "./ArenaHeader";
 import { GridRenderer } from "./GridRenderer";
@@ -74,22 +75,10 @@ export function ArenaView({ build, onAbort, onPhaseChange }: Props) {
       pos: { x: 2, y: 5 },
       passives: passiveIds,
       loadout: build.loadout,
+      effects: [],
     };
 
-    const initialEnemyState: EntityState = {
-      id: "enemy",
-      hp: 120,
-      maxHp: 120,
-      pa: 0,
-      maxPa: 0,
-      pm: 0,
-      maxPm: 0,
-      mana: 0,
-      maxMana: 0,
-      pos: { x: 7, y: 5 },
-      passives: [],
-      loadout: [],
-    };
+    const initialEnemyState = generateEnemyBuild();
 
     initializeGame(initialPlayerState, initialEnemyState);
   }, [build, initializeGame, pSoul, passiveIds]);

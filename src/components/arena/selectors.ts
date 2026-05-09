@@ -17,7 +17,10 @@ export const getSimulatedResources = (state: GameState): SimulatedResources => {
       mana: acc.mana - action.manaCost,
     }),
     {
-      pa: server.player.pa + server.persistentBuffs.bonusPa + (server.skipRequested ? 1 : 0),
+      pa:
+        server.player.pa +
+        server.persistentBuffs.bonusPa +
+        (server.skipRequested ? 1 : 0),
       pm: server.player.pm,
       mana: server.player.mana,
     },
@@ -43,7 +46,10 @@ export const isCellWall = (cell: Pos): boolean => {
   return obstacles.some((o) => o.x === cell.x && o.y === cell.y);
 };
 
-export const isCellInteractableWall = (state: GameState, cell: Pos): boolean => {
+export const isCellInteractableWall = (
+  state: GameState,
+  cell: Pos,
+): boolean => {
   return state.server.interactables.some(
     (i) => i.type === "wall" && i.pos.x === cell.x && i.pos.y === cell.y,
   );
@@ -65,6 +71,10 @@ export const selectActiveCommand = (state: GameState) => state.ui.activeCommand;
 export const selectLogs = (state: GameState) => state.ui.logs;
 export const selectVisualEffects = (state: GameState) => state.ui.visualEffects;
 export const selectTurnTimer = (state: GameState) => state.ui.turnTimer;
-export const selectSkipRequested = (state: GameState) => state.server.skipRequested;
-export const selectInteractables = (state: GameState) => state.server.interactables;
+export const selectSkipRequested = (state: GameState) =>
+  state.server.skipRequested;
+export const selectInteractables = (state: GameState) =>
+  state.server.interactables;
 export const selectCombatStats = (state: GameState) => state.ui.combatStats;
+export const selectEnemyCombatStats = (state: GameState) =>
+  state.ui.enemyCombatStats;
