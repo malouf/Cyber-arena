@@ -1,7 +1,6 @@
 import { obstacles } from "./data";
 import { selectEnemyActions } from "./ai";
 import type {
-  Ability,
   Action,
   CombatEvent,
   EntityState,

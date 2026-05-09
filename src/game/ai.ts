@@ -5,7 +5,6 @@ import type {
   EntityState,
   Interactable,
   LoadoutSlot,
-  Passive,
   Pos,
   SoulId,
 } from "./types";

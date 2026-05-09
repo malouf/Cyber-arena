@@ -18,7 +18,7 @@ export function CommandPanel({
   cooldowns,
   disabled = false,
 }: Props) {
-  const passiveSlots = loadout.filter(s => s.kind === "passive");
+  const passiveSlots = loadout.filter((s) => s.kind === "passive");
 
   const getSlotLabel = (slot: LoadoutSlot, index: number) => {
     if (slot.kind === "elite") return "ELITE";
@@ -57,9 +57,12 @@ export function CommandPanel({
           }
 
           const ability = slot.ability;
-          const canAfford = simStats.pa >= ability.paCost && simStats.mana >= ability.manaCost;
+          const canAfford =
+            simStats.pa >= ability.paCost && simStats.mana >= ability.manaCost;
           const isElite = slot.kind === "elite";
-          const isActive = activeCommand?.type === "ability" && activeCommand.ability.id === ability.id;
+          const isActive =
+            activeCommand?.type === "ability" &&
+            activeCommand.ability.id === ability.id;
           const currentCooldown = cooldowns[ability.id] || 0;
           const canUse = !disabled && canAfford && currentCooldown === 0;
 
@@ -71,18 +74,36 @@ export function CommandPanel({
               className={`p-2 border transition-all text-left relative ${isElite ? "border-red-600/50 bg-red-900/10" : "border-neutral-800 bg-neutral-900"} ${canUse ? (isActive ? "border-white bg-neutral-800" : "hover:border-neutral-500") : "opacity-40 cursor-not-allowed"}`}
               title={`${ability.name}\n${ability.desc}\nPA: ${ability.paCost} | M: ${ability.manaCost} | CD: ${ability.cooldown || 0}`}
             >
-              {isElite && <div className="absolute top-0 left-0 w-1 h-full bg-red-600" />}
-              {isActive && <div className="absolute top-0 right-0 w-1 h-full bg-white" />}
+              {isElite && (
+                <div className="absolute top-0 left-0 w-1 h-full bg-red-600" />
+              )}
+              {isActive && (
+                <div className="absolute top-0 right-0 w-1 h-full bg-white" />
+              )}
               <div className="text-[8px] text-neutral-500 uppercase mb-0.5">
                 {getSlotLabel(slot, index)}
               </div>
-              <div className={`text-[9px] font-bold truncate ${isElite ? "text-red-400" : "text-white"}`}>
+              <div
+                className={`text-[9px] font-bold truncate ${isElite ? "text-red-400" : "text-white"}`}
+              >
                 {ability.name}
               </div>
               <div className="flex justify-between mt-1">
-                {currentCooldown > 0 && <span className="text-[7px] text-red-500">CD:{currentCooldown}</span>}
-                {ability.paCost > 0 && <span className="text-[7px] text-neutral-400">{ability.paCost}PA</span>}
-                {ability.manaCost > 0 && <span className="text-[7px] text-blue-500">{ability.manaCost}M</span>}
+                {currentCooldown > 0 && (
+                  <span className="text-[7px] text-red-500">
+                    CD:{currentCooldown}
+                  </span>
+                )}
+                {ability.paCost > 0 && (
+                  <span className="text-[7px] text-neutral-400">
+                    {ability.paCost}PA
+                  </span>
+                )}
+                {ability.manaCost > 0 && (
+                  <span className="text-[7px] text-blue-500">
+                    {ability.manaCost}M
+                  </span>
+                )}
               </div>
             </button>
           );
@@ -93,7 +114,7 @@ export function CommandPanel({
         <button
           disabled={disabled || simStats.pm <= 0}
           onClick={() => setActiveCommand({ type: "move" })}
-          className={`w-full py-2 flex justify-between px-3 items-center border transition-all uppercase tracking-widest text-[10px] font-bold mb-2 ${!disabled && simStats.pm > 0 ? activeCommand?.type === "move" ? "bg-white text-black border-white" : "bg-neutral-900 border-neutral-700 text-white hover:border-white" : "bg-black border-neutral-900 text-neutral-700 cursor-not-allowed"}`}
+          className={`w-full py-2 flex justify-between px-3 items-center border transition-all uppercase tracking-widest text-[10px] font-bold mb-2 ${!disabled && simStats.pm > 0 ? (activeCommand?.type === "move" ? "bg-white text-black border-white" : "bg-neutral-900 border-neutral-700 text-white hover:border-white") : "bg-black border-neutral-900 text-neutral-700 cursor-not-allowed"}`}
         >
           <span>Move</span>
           <span className="font-mono">PM Based</span>
@@ -103,7 +124,9 @@ export function CommandPanel({
           <div className="p-3 bg-neutral-900 border border-neutral-700 relative shadow-2xl">
             {activeCommand.type === "move" ? (
               <>
-                <h4 className="text-[10px] font-bold text-white uppercase mb-1">Move</h4>
+                <h4 className="text-[10px] font-bold text-white uppercase mb-1">
+                  Move
+                </h4>
                 <p className="text-[9px] text-neutral-400 uppercase leading-relaxed">
                   Reposition unit. Costs PM based on distance.
                 </p>
@@ -123,11 +146,14 @@ export function CommandPanel({
                 </p>
                 <div className="flex justify-between">
                   <span className="text-[9px] text-red-500 font-mono">
-                    RNG: {activeCommand.ability.range} | DMG: {activeCommand.ability.damage}
+                    RNG: {activeCommand.ability.range} | DMG:{" "}
+                    {activeCommand.ability.damage}
                   </span>
                   <span className="text-[9px] text-neutral-500 font-mono">
-                    {activeCommand.ability.cooldown && `CD: ${activeCommand.ability.cooldown} `}
-                    {activeCommand.ability.maxUsesPerTurn && `Max/Turn: ${activeCommand.ability.maxUsesPerTurn}`}
+                    {activeCommand.ability.cooldown &&
+                      `CD: ${activeCommand.ability.cooldown} `}
+                    {activeCommand.ability.maxUsesPerTurn &&
+                      `Max/Turn: ${activeCommand.ability.maxUsesPerTurn}`}
                   </span>
                 </div>
               </>

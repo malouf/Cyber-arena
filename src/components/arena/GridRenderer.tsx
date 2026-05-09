@@ -109,7 +109,8 @@ export function GridRenderer({ buildPassives, interactables = [] }: Props) {
                 }
                 inValidRange =
                   distance <= effectiveRange &&
-                  (!isWall && !isDynamicWallCell || activeCommand.ability.type === "buff");
+                  ((!isWall && !isDynamicWallCell) ||
+                    activeCommand.ability.type === "buff");
               }
 
               const isHoveredValid =
