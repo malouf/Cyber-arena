@@ -1,4 +1,4 @@
-import type { Soul, SoulId } from "./types";
+import type { Interactable, Soul, SoulId } from "./types";
 
 export const soulData: Record<SoulId, Soul> = {
   onde: {
@@ -78,11 +78,13 @@ export const soulData: Record<SoulId, Soul> = {
         id: "drain_force",
         name: "Drain de Force",
         desc: "Gain 1 Mana when displacing an enemy.",
+        effect: "drain_force",
       },
       {
         id: "flow_state",
         name: "Flow State",
         desc: "If you do not move, next spell gains +1 Range.",
+        effect: "flow_state",
       },
     ],
   },
@@ -163,11 +165,13 @@ export const soulData: Record<SoulId, Soul> = {
         id: "masochism",
         name: "Masochism",
         desc: "Taking damage restores 1 PA for the next turn.",
+        effect: "masochism",
       },
       {
         id: "momentum",
         name: "Momentum",
         desc: "Each cell moved increases next attack damage by 2.",
+        effect: "momentum",
       },
     ],
   },
@@ -248,18 +252,20 @@ export const soulData: Record<SoulId, Soul> = {
         id: "thorns",
         name: "Thorns",
         desc: "Enemies attacking from range 1 take 5 damage.",
+        effect: "thorns",
       },
       {
         id: "heavy_plating",
         name: "Heavy Plating",
         desc: "Max PM reduced by 1, reduce all incoming damage by 3.",
+        effect: "heavy_plating",
       },
     ],
   },
 };
 
 // Static obstacles for practice arena
-export const obstacles = [
+export const obstacles: Array<{ x: number; y: number }> = [
   { x: 5, y: 4 },
   { x: 5, y: 5 },
   { x: 5, y: 6 },
@@ -272,4 +278,11 @@ export const obstacles = [
   { x: 9, y: 2 },
   { x: 8, y: 13 },
   { x: 9, y: 13 },
+];
+
+// Initial interactables for the arena (mana wells)
+export const initialInteractables: Array<Interactable> = [
+  { id: "well_1", type: "mana_well", pos: { x: 3, y: 8 }, duration: -1, value: 2, triggeredBy: "player" },
+  { id: "well_2", type: "mana_well", pos: { x: 12, y: 8 }, duration: -1, value: 2, triggeredBy: "enemy" },
+  { id: "well_3", type: "mana_well", pos: { x: 7, y: 7 }, duration: -1, value: 1, triggeredBy: "both" },
 ];
