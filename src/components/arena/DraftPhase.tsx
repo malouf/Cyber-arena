@@ -109,9 +109,7 @@ export function DraftPhase({ onComplete }: Props) {
   };
 
   const canDeploy =
-    primarySoul &&
-    secondarySoul &&
-    selectedLoadout.length === 7;
+    primarySoul && secondarySoul && selectedLoadout.length === 7;
 
   if (phase === "primary" || phase === "secondary") {
     const isPrimary = phase === "primary";
@@ -299,8 +297,8 @@ export function DraftPhase({ onComplete }: Props) {
                   {eliteSlot.ability.desc}
                 </div>
                 <div className="text-[9px] font-mono text-red-500 mt-2">
-                  DMG: {eliteSlot.ability.damage} | RNG: {eliteSlot.ability.range} |
-                  CD: {eliteSlot.ability.cooldown}
+                  DMG: {eliteSlot.ability.damage} | RNG:{" "}
+                  {eliteSlot.ability.range} | CD: {eliteSlot.ability.cooldown}
                 </div>
               </div>
             </div>
@@ -315,9 +313,12 @@ export function DraftPhase({ onComplete }: Props) {
                   Active Abilities
                 </h2>
                 <span className="text-[10px] font-mono text-neutral-500">
-                  {activeSlots.filter(s => 
-                    s.kind === "active" && selectedLoadout.includes(s.ability.id)
-                  ).length} / 4 Selected
+                  {
+                    activeSlots.filter((s) =>
+                      selectedLoadout.includes(s.ability.id),
+                    ).length
+                  }{" "}
+                  / 4 Selected
                 </span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -325,7 +326,9 @@ export function DraftPhase({ onComplete }: Props) {
                   const ability = slot.ability;
                   const isSelected = selectedLoadout.includes(ability.id);
                   const isDisabled = !isSelected && selectedLoadout.length >= 7;
-                  const isPrimaryAbility = pSoul.actives.some(a => a.id === ability.id) || ability.id === pSoul.baseAttack.id;
+                  const isPrimaryAbility =
+                    pSoul.actives.some((a) => a.id === ability.id) ||
+                    ability.id === pSoul.baseAttack.id;
                   const isBase = ability.id === pSoul.baseAttack.id;
 
                   return (
@@ -366,7 +369,11 @@ export function DraftPhase({ onComplete }: Props) {
                           DMG: {ability.damage} | RNG: {ability.range}
                         </span>
                         <span className="text-[9px] font-mono text-neutral-500">
-                          {isBase ? "(Base)" : isPrimaryAbility ? "(Primary)" : "(Secondary)"}
+                          {isBase
+                            ? "(Base)"
+                            : isPrimaryAbility
+                              ? "(Primary)"
+                              : "(Secondary)"}
                         </span>
                       </div>
                     </button>
@@ -382,9 +389,12 @@ export function DraftPhase({ onComplete }: Props) {
                   Passive Synergies
                 </h2>
                 <span className="text-[10px] font-mono text-neutral-500">
-                  {passiveSlots.filter(s => 
-                    s.kind === "passive" && selectedLoadout.includes(s.passive.id)
-                  ).length} / 3 Selected
+                  {
+                    passiveSlots.filter((s) =>
+                      selectedLoadout.includes(s.passive.id),
+                    ).length
+                  }{" "}
+                  / 3 Selected
                 </span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -392,7 +402,9 @@ export function DraftPhase({ onComplete }: Props) {
                   const passive = slot.passive;
                   const isSelected = selectedLoadout.includes(passive.id);
                   const isDisabled = !isSelected && selectedLoadout.length >= 7;
-                  const isPrimaryPassive = pSoul.passives.some(p => p.id === passive.id);
+                  const isPrimaryPassive = pSoul.passives.some(
+                    (p) => p.id === passive.id,
+                  );
 
                   return (
                     <button
@@ -430,7 +442,9 @@ export function DraftPhase({ onComplete }: Props) {
               <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
                 {/* Slot 0: Elite */}
                 <div className="p-2 border border-red-900/50 bg-red-900/10 text-center">
-                  <div className="text-[8px] text-red-500 uppercase mb-1">Elite</div>
+                  <div className="text-[8px] text-red-500 uppercase mb-1">
+                    Elite
+                  </div>
                   <div className="text-[9px] font-bold text-white truncate">
                     {eliteSlot.ability.name}
                   </div>
@@ -439,18 +453,20 @@ export function DraftPhase({ onComplete }: Props) {
                 {Array.from({ length: 7 }, (_, i) => {
                   const selectedSlot = selectedLoadout[i];
                   let slotInfo = null;
-                  
+
                   if (selectedSlot) {
-                    const slot = availableSlots.find(s => {
-                      if (s.kind === "active" && s.ability.id === selectedSlot) return true;
-                      if (s.kind === "passive" && s.passive.id === selectedSlot) return true;
+                    const slot = availableSlots.find((s) => {
+                      if (s.kind === "active" && s.ability.id === selectedSlot)
+                        return true;
+                      if (s.kind === "passive" && s.passive.id === selectedSlot)
+                        return true;
                       return false;
                     });
                     if (slot) {
                       slotInfo = slot;
                     }
                   }
-                  
+
                   return (
                     <div
                       key={i}

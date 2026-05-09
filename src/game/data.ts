@@ -54,10 +54,16 @@ export const soulData: Record<SoulId, Soul> = {
         manaCost: 2,
         range: 3,
         damage: 0,
-        type: "trap",
-        desc: "Blocks an area for 1 turn.",
+        type: "attack",
+        desc: "Stuns the target for 1 turn.",
         initiative: 70,
         cooldown: 2,
+        effect: {
+          id: "stasis_stun",
+          type: "stun",
+          name: "Stasis",
+          duration: 1,
+        },
       },
       {
         id: "flux",
@@ -102,9 +108,16 @@ export const soulData: Record<SoulId, Soul> = {
       range: 1,
       damage: 25,
       type: "attack",
-      desc: "High damage melee attack.",
+      desc: "High damage melee attack. Applies Bleed.",
       initiative: 50,
       maxUsesPerTurn: 2,
+      effect: {
+        id: "bleed",
+        type: "dot",
+        name: "Bleed",
+        duration: 2,
+        value: 10,
+      },
     },
     ultimate: {
       id: "execute",
@@ -242,9 +255,16 @@ export const soulData: Record<SoulId, Soul> = {
         range: 0,
         damage: 0,
         type: "buff",
-        desc: "Grants shield and immobilizes self.",
+        desc: "Grants 30 HP shield for 2 turns.",
         initiative: 95,
         cooldown: 3,
+        effect: {
+          id: "fortify_shield",
+          type: "shield",
+          name: "Fortified",
+          duration: 2,
+          value: 30,
+        },
       },
     ],
     passives: [
@@ -282,7 +302,28 @@ export const obstacles: Array<{ x: number; y: number }> = [
 
 // Initial interactables for the arena (mana wells)
 export const initialInteractables: Array<Interactable> = [
-  { id: "well_1", type: "mana_well", pos: { x: 3, y: 8 }, duration: -1, value: 2, triggeredBy: "player" },
-  { id: "well_2", type: "mana_well", pos: { x: 12, y: 8 }, duration: -1, value: 2, triggeredBy: "enemy" },
-  { id: "well_3", type: "mana_well", pos: { x: 7, y: 7 }, duration: -1, value: 1, triggeredBy: "both" },
+  {
+    id: "well_1",
+    type: "mana_well",
+    pos: { x: 3, y: 8 },
+    duration: -1,
+    value: 2,
+    triggeredBy: "player",
+  },
+  {
+    id: "well_2",
+    type: "mana_well",
+    pos: { x: 12, y: 8 },
+    duration: -1,
+    value: 2,
+    triggeredBy: "enemy",
+  },
+  {
+    id: "well_3",
+    type: "mana_well",
+    pos: { x: 7, y: 7 },
+    duration: -1,
+    value: 1,
+    triggeredBy: "both",
+  },
 ];

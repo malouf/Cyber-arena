@@ -42,7 +42,11 @@ export function TurnClock() {
         bonusPa: persistentBuffs.bonusPa,
         isRestTurn: true,
       });
-    } else if (phase === "planning" && turnTimer <= 0 && actionQueue.length === 0) {
+    } else if (
+      phase === "planning" &&
+      turnTimer <= 0 &&
+      actionQueue.length === 0
+    ) {
       // No actions queued, just reset timer
       setTurnTimer(60);
     }
@@ -95,7 +99,9 @@ export function TurnClock() {
               style={{ width: `${timerPercent}%` }}
             />
           </div>
-          <span className={`text-xs font-mono ${isLow ? "text-red-500 animate-pulse" : "text-neutral-500"}`}>
+          <span
+            className={`text-xs font-mono ${isLow ? "text-red-500 animate-pulse" : "text-neutral-500"}`}
+          >
             {turnTimer}s
           </span>
         </div>
@@ -113,7 +119,6 @@ export function TurnClock() {
           <>
             <button
               onClick={handleSkipTurn}
-              disabled={phase !== "planning"}
               className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-neutral-700 bg-neutral-900 text-neutral-400 hover:bg-neutral-800 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Skip Turn

@@ -1,4 +1,10 @@
-import type { Ability, Action, CombatStats, EntityState, Interactable } from "../../game/types";
+import type {
+  Ability,
+  Action,
+  CombatStats,
+  EntityState,
+  Interactable,
+} from "../../game/types";
 
 export type ArenaPhase = "drafting" | "planning" | "resolving" | "playback";
 
@@ -40,6 +46,7 @@ export type GameUiState = {
   turnTimerMax: number;
   showStats: boolean;
   combatStats: CombatStats;
+  enemyCombatStats: CombatStats;
 };
 
 export type GameState = {

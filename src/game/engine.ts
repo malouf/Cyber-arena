@@ -1,6 +1,6 @@
 import { obstacles } from "./data";
+import { selectEnemyActions } from "./ai";
 import type {
-  Ability,
   Action,
   CombatEvent,
   EntityState,
@@ -38,16 +38,31 @@ export function resolveTurn(
   pQueue: Array<Action>,
   turnState: TurnState,
   params: ResolveTurnParams = {},
-): { events: Array<CombatEvent>; nextTurnState: TurnState; interactables: Array<Interactable> } {
+): {
+  events: Array<CombatEvent>;
+  nextTurnState: TurnState;
+  interactables: Array<Interactable>;
+} {
   const events: Array<CombatEvent> = [];
-  const { interactables: initialInteractables = [], isRestTurn = false, skipRequested = false } = params;
+  const {
+    interactables: initialInteractables = [],
+    isRestTurn = false,
+    skipRequested = false,
+  } = params;
 
   // Clone interactables to track state
-  const interactables = initialInteractables.map(i => ({ ...i }));
+  const interactables = initialInteractables.map((i) => ({ ...i }));
 
   // Clone state for simulation
-  const pStats = { ...pState, pa: pState.pa + turnState.bonusPa + (isRestTurn ? 1 : 0) };
-  const eStats = { ...eState };
+  const pStats = {
+    ...pState,
+    pa: pState.pa + turnState.bonusPa + (isRestTurn ? 1 : 0),
+    effects: pState.effects.map((e) => ({ ...e })),
+  };
+  const eStats = {
+    ...eState,
+    effects: eState.effects.map((e) => ({ ...e })),
+  };
   let pPos = { ...pState.pos };
   let ePos = { ...eState.pos };
 
@@ -59,6 +74,28 @@ export function resolveTurn(
 
   events.push({ type: "log", text: "> INITIATING SEQUENCE RESOLUTION" });
 
+  // --- PROCESS STATUS EFFECTS (DoT) ---
+  [pStats, eStats].forEach((stats) => {
+    stats.effects
+      .filter((e) => e.type === "dot")
+      .forEach((dot) => {
+        const dmg = dot.value || 0;
+        stats.hp -= dmg;
+        events.push({
+          type: "log",
+          text: `> ${stats.id === "player" ? "Player" : "Enemy"} takes ${dmg} DoT from ${dot.name}.`,
+        });
+        events.push({
+          type: "effect",
+          pos: { ...(stats.id === "player" ? pPos : ePos) },
+          text: `-${dmg}`,
+          color: "text-orange-500",
+          target: stats.id,
+        });
+        events.push({ type: "stats", entity: stats.id, hp: stats.hp });
+      });
+  });
+
   // Apply rest bonus logging
   if (isRestTurn || skipRequested) {
     events.push({ type: "log", text: "> REST BONUS APPLIED: +1 PA" });
@@ -66,70 +103,8 @@ export function resolveTurn(
   }
 
   // --- AI LOGIC ---
-  const eQueue: Array<Action> = [];
-  if (eStats.hp > 0) {
-    let currentEPos = { ...ePos };
-    for (let step = 0; step < eStats.pm; step++) {
-      const dist = getDistance(currentEPos, pPos);
-      if (dist <= 1) break;
-
-      const neighbors = getNeighbors(currentEPos);
-      let bestNeighbor = null;
-      let minDist = dist;
-
-      for (const neighbor of neighbors) {
-        const isWall = obstacles.some(
-          (o) => o.x === neighbor.x && o.y === neighbor.y,
-        );
-        const isPlayer = neighbor.x === pPos.x && neighbor.y === pPos.y;
-        // Check for walls from interactables
-        const isInteractableWall = interactables.some(
-          (i) => i.type === "wall" && i.pos.x === neighbor.x && i.pos.y === neighbor.y,
-        );
-        if (isWall || isPlayer || isInteractableWall) continue;
-
-        const d = getDistance(neighbor, pPos);
-        if (d < minDist) {
-          minDist = d;
-          bestNeighbor = neighbor;
-        }
-      }
-
-      if (bestNeighbor) {
-        currentEPos = bestNeighbor;
-        eQueue.push({
-          type: "move",
-          target: currentEPos,
-          initiative: 100 - step,
-          name: "Move",
-          paCost: 0,
-          pmCost: 1,
-          manaCost: 0,
-        });
-      } else {
-        break;
-      }
-    }
-
-    if (getDistance(currentEPos, pPos) <= 1) {
-      eQueue.push({
-        type: "ability",
-        target: pPos,
-        name: "Basic Attack",
-        initiative: 50,
-        paCost: 0,
-        pmCost: 0,
-        manaCost: 0,
-        ability: {
-          id: "bot_attack",
-          name: "Basic Attack",
-          damage: 15,
-          range: 1,
-          type: "attack",
-        } as Ability,
-      });
-    }
-  }
+  const eQueue: Array<Action> =
+    eStats.hp > 0 ? selectEnemyActions(eStats, pStats, interactables) : [];
 
   // Helper to check for interactables at position
   const checkInteractables = (entity: "player" | "enemy", pos: Pos) => {
@@ -138,7 +113,8 @@ export function resolveTurn(
       if (
         interactable.pos.x === pos.x &&
         interactable.pos.y === pos.y &&
-        (interactable.triggeredBy === entity || interactable.triggeredBy === "both")
+        (interactable.triggeredBy === entity ||
+          interactable.triggeredBy === "both")
       ) {
         triggered.push(interactable);
       }
@@ -151,8 +127,27 @@ export function resolveTurn(
     amount: number,
     isMelee: boolean,
   ) => {
+    const stats = target === "player" ? pStats : eStats;
+    let finalDamage = amount;
+
+    // Shield check
+    const shieldIndex = stats.effects.findIndex((e) => e.type === "shield");
+    if (shieldIndex !== -1 && finalDamage > 0) {
+      const shield = stats.effects[shieldIndex];
+      const absorbed = Math.min(shield.value || 0, finalDamage);
+      if (shield.value !== undefined) shield.value -= absorbed;
+      finalDamage -= absorbed;
+      events.push({
+        type: "log",
+        text: `> Shield absorbed ${absorbed} damage!`,
+      });
+      if ((shield.value || 0) <= 0) {
+        stats.effects.splice(shieldIndex, 1);
+        events.push({ type: "log", text: `> Shield BROKEN!` });
+      }
+    }
+
     if (target === "player") {
-      let finalDamage = amount;
       // Check for heavy_plating passive
       if (pStats.passives.includes("heavy_plating")) {
         const mitigated = Math.min(3, finalDamage);
@@ -168,6 +163,7 @@ export function resolveTurn(
         pos: { ...pPos },
         text: `-${finalDamage}`,
         color: "text-red-500",
+        target: "player",
       });
       events.push({ type: "stats", entity: "player", hp: pStats.hp });
 
@@ -181,20 +177,31 @@ export function resolveTurn(
           pos: { ...ePos },
           text: `-5`,
           color: "text-red-500",
+          target: "enemy",
         });
         events.push({ type: "stats", entity: "enemy", hp: eStats.hp });
         events.push({ type: "log", text: "> Thorns reflected 5 DMG!" });
       }
     } else {
-      eStats.hp -= amount;
+      eStats.hp -= finalDamage;
       events.push({
         type: "effect",
         pos: { ...ePos },
-        text: `-${amount}`,
+        text: `-${finalDamage}`,
         color: "text-red-500",
+        target: "enemy",
       });
       events.push({ type: "stats", entity: "enemy", hp: eStats.hp });
     }
+  };
+
+  const applyEffect = (target: "player" | "enemy", effect: any) => {
+    const stats = target === "player" ? pStats : eStats;
+    stats.effects.push({ ...effect });
+    events.push({
+      type: "log",
+      text: `> Applied ${effect.name} to ${target === "player" ? "Player" : "Enemy"}!`,
+    });
   };
 
   const maxSteps = Math.max(pQueue.length, eQueue.length);
@@ -217,9 +224,20 @@ export function resolveTurn(
       if (pStats.hp <= 0 && action.entity === "player") continue;
       if (eStats.hp <= 0 && action.entity === "enemy") continue;
 
+      const isPlayer = action.entity === "player";
+      const stats = isPlayer ? pStats : eStats;
+
+      // Stun check
+      if (stats.effects.some((e) => e.type === "stun")) {
+        events.push({
+          type: "log",
+          text: `> ${isPlayer ? "Player" : "Enemy"} is STUNNED and skips action!`,
+        });
+        continue;
+      }
+
       events.push({ type: "delay", ms: 900 });
 
-      const isPlayer = action.entity === "player";
       const myPos = isPlayer ? pPos : ePos;
       const hisPos = isPlayer ? ePos : pPos;
       const targetPos = isPlayer ? ePos : pPos;
@@ -250,8 +268,17 @@ export function resolveTurn(
                 type: "log",
                 text: `> Mana Well restored ${int.value} Mana!`,
               });
-              events.push({ type: "stats", entity: "player", mana: pStats.mana });
-              events.push({ type: "interact", entity: "player", interactableId: int.id, interactableType: int.type });
+              events.push({
+                type: "stats",
+                entity: "player",
+                mana: pStats.mana,
+              });
+              events.push({
+                type: "interact",
+                entity: "player",
+                interactableId: int.id,
+                interactableType: int.type,
+              });
             }
           }
         } else {
@@ -263,7 +290,12 @@ export function resolveTurn(
           for (const int of triggered) {
             if (int.type === "mana_well") {
               eStats.mana = Math.min(eStats.maxMana, eStats.mana + int.value);
-              events.push({ type: "interact", entity: "enemy", interactableId: int.id, interactableType: int.type });
+              events.push({
+                type: "interact",
+                entity: "enemy",
+                interactableId: int.id,
+                interactableType: int.type,
+              });
             }
           }
         }
@@ -313,6 +345,8 @@ export function resolveTurn(
           const dist = getDistance(myPos, hisPos);
           if (dist <= 1) {
             applyDamage(isPlayer ? "enemy" : "player", dmg, true);
+            if (ability.effect)
+              applyEffect(isPlayer ? "enemy" : "player", ability.effect);
             events.push({
               type: "log",
               text: `> ${ability.name} hits for ${dmg} DMG.`,
@@ -341,7 +375,10 @@ export function resolveTurn(
                 const isMe = n.x === myPos.x && n.y === myPos.y;
                 // Check for interactable walls
                 const isInteractableWall = interactables.some(
-                  (i) => i.type === "wall" && i.pos.x === n.x && i.pos.y === n.y,
+                  (int) =>
+                    int.type === "wall" &&
+                    int.pos.x === n.x &&
+                    int.pos.y === n.y,
                 );
                 if (!isWall && !isMe && !isInteractableWall) {
                   minDist = d;
@@ -402,6 +439,8 @@ export function resolveTurn(
               finalResonanceDmg,
               false,
             );
+            if (ability.effect)
+              applyEffect(isPlayer ? "enemy" : "player", ability.effect);
             events.push({
               type: "log",
               text: `> Resonance hits for ${finalResonanceDmg} DMG! (+${bonusDmg} from movement)`,
@@ -421,6 +460,7 @@ export function resolveTurn(
             ePos = { x: ePos.x + dx, y: ePos.y + dy };
             events.push({ type: "move", entity: "enemy", pos: { ...ePos } });
             applyDamage("enemy", dmg, false);
+            if (ability.effect) applyEffect("enemy", ability.effect);
             events.push({
               type: "log",
               text: `> Impulsion pushes Enemy to [${ePos.x}, ${ePos.y}]! ${dmg} DMG.`,
@@ -439,6 +479,13 @@ export function resolveTurn(
             }
           } else {
             events.push({ type: "log", text: `> Impulsion MISSED.` });
+          }
+          continue;
+        }
+
+        if (ability.type === "buff") {
+          if (ability.effect) {
+            applyEffect(isPlayer ? "player" : "enemy", ability.effect);
           }
           continue;
         }
@@ -482,6 +529,8 @@ export function resolveTurn(
           );
           if (newDist <= 1) {
             applyDamage(isPlayer ? "enemy" : "player", dmg, true);
+            if (ability.effect)
+              applyEffect(isPlayer ? "enemy" : "player", ability.effect);
             events.push({
               type: "log",
               text: `> ${ability.name} hits for ${dmg} DMG.`,
@@ -500,12 +549,14 @@ export function resolveTurn(
             ) {
               if (isPlayer) {
                 applyDamage("enemy", dmg, currentDist <= 1);
+                if (ability.effect) applyEffect("enemy", ability.effect);
                 events.push({
                   type: "log",
                   text: `> ${ability.name} hits Enemy! ${dmg} DMG.`,
                 });
               } else {
                 applyDamage("player", dmg, currentDist <= 1);
+                if (ability.effect) applyEffect("player", ability.effect);
                 events.push({
                   type: "log",
                   text: `> Enemy uses ${ability.name}! ${dmg} DMG.`,
@@ -546,6 +597,12 @@ export function resolveTurn(
   });
 
   // End of turn cleanup
+  [pStats, eStats].forEach((stats) => {
+    stats.effects = stats.effects
+      .map((e) => ({ ...e, duration: e.duration - 1 }))
+      .filter((e) => e.duration > 0);
+  });
+
   pStats.pa = pStats.maxPa;
   pStats.pm = pStats.maxPm;
   pStats.mana = Math.min(pStats.maxMana, pStats.mana + 1);

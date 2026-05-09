@@ -1,6 +1,11 @@
 import { useShallow } from "zustand/shallow";
 import { useGameStore } from "./gameStore";
-import { selectActionQueue, selectLogs, selectPhase, selectSkipRequested } from "./selectors";
+import {
+  selectActionQueue,
+  selectLogs,
+  selectPhase,
+  selectSkipRequested,
+} from "./selectors";
 
 export function SequencePanel() {
   const actionQueue = useGameStore(selectActionQueue);
@@ -79,7 +84,8 @@ export function SequencePanel() {
         <div className="flex-1 overflow-y-auto space-y-2 mb-4 pr-2">
           {actionQueue.length === 0 ? (
             <p className="text-[9px] text-neutral-700 font-mono">
-              No commands queued. Click abilities or use Skip Turn for rest bonus.
+              No commands queued. Click abilities or use Skip Turn for rest
+              bonus.
             </p>
           ) : (
             actionQueue.map((action, i) => (
@@ -125,7 +131,7 @@ export function SequencePanel() {
           >
             {commitLabel}
           </button>
-          {actionQueue.length === 0 && !isResolving && phase === "planning" && (
+          {actionQueue.length === 0 && !isResolving && (
             <button
               onClick={handleSkipTurn}
               className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest border border-green-600/50 bg-green-900/20 text-green-400 hover:bg-green-900/40 transition-colors"

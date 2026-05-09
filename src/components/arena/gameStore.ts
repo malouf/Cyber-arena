@@ -1,7 +1,11 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { initialInteractables } from "../../game/data";
-import { aggregateStats, initialCombatStats } from "../../game/analytics";
+import {
+  aggregateStats,
+  calculateTurnStats,
+  initialCombatStats,
+} from "../../game/analytics";
 import {
   getDistance,
   getLastQueuedPos,
@@ -10,11 +14,13 @@ import {
   isCellOccupiedByEnemy,
   isCellWall,
 } from "./selectors";
-import type { Action,
+import type {
+  Action,
   CombatEvent,
   EntityState,
   TurnState,
-  TurnStats } from "../../game/types";
+  TurnStats,
+} from "../../game/types";
 import type { ActiveCommand, GameState } from "./types";
 
 type GameStore = GameState & {
@@ -46,7 +52,9 @@ type GameStore = GameState & {
   ) => Promise<void>;
   setTurnTimer: (time: number) => void;
   requestSkip: () => void;
-  updateInteractables: (interactables: GameState["server"]["interactables"]) => void;
+  updateInteractables: (
+    interactables: GameState["server"]["interactables"],
+  ) => void;
   updateCombatStats: (turnStats: TurnStats) => void;
   toggleStatsOverlay: () => void;
   resetCombatStats: () => void;
@@ -71,6 +79,7 @@ export const useGameStore = create<GameStore>()(
         pos: { x: 0, y: 0 },
         passives: [],
         loadout: [],
+        effects: [],
       },
       enemy: {
         id: "enemy",
@@ -85,6 +94,7 @@ export const useGameStore = create<GameStore>()(
         pos: { x: 0, y: 0 },
         passives: [],
         loadout: [],
+        effects: [],
       },
       actionQueue: [],
       cooldowns: {},
@@ -104,12 +114,21 @@ export const useGameStore = create<GameStore>()(
       turnTimerMax: TURN_TIMER_MAX,
       showStats: false,
       combatStats: initialCombatStats,
+      enemyCombatStats: initialCombatStats,
     },
 
     initializeGame: (player, enemy, initialLogs) =>
       set((state) => {
-        state.server.player = { ...player, loadout: player.loadout || [] };
-        state.server.enemy = { ...enemy, loadout: enemy.loadout || [] };
+        state.server.player = {
+          ...player,
+          loadout: player.loadout,
+          effects: player.effects,
+        };
+        state.server.enemy = {
+          ...enemy,
+          loadout: enemy.loadout,
+          effects: enemy.effects,
+        };
         state.server.actionQueue = [];
         state.server.cooldowns = {};
         state.server.usesThisTurn = {};
@@ -216,7 +235,10 @@ export const useGameStore = create<GameStore>()(
         }
 
         if (
-          !(dist <= effectiveRange && (!isWall && !isInteractableWall || ability.type === "buff"))
+          !(
+            dist <= effectiveRange &&
+            ((!isWall && !isInteractableWall) || ability.type === "buff")
+          )
         ) {
           state.ui.logs = [
             `Target out of range for ${ability.name}.`,
@@ -235,7 +257,10 @@ export const useGameStore = create<GameStore>()(
           return;
         }
 
-        if (ability.type === "move_attack" && (isOccupiedByEnemy || isWall || isInteractableWall)) {
+        if (
+          ability.type === "move_attack" &&
+          (isOccupiedByEnemy || isWall || isInteractableWall)
+        ) {
           state.ui.logs = [
             "Cannot leap onto occupied cell.",
             ...state.ui.logs,
@@ -380,7 +405,11 @@ export const useGameStore = create<GameStore>()(
         enemy,
         queue,
         turnState,
-        { interactables: state.server.interactables, isRestTurn, skipRequested },
+        {
+          interactables: state.server.interactables,
+          isRestTurn,
+          skipRequested,
+        },
       );
 
       // Update interactables in store
@@ -404,6 +433,16 @@ export const useGameStore = create<GameStore>()(
           applyEvent(event);
         }
       }
+
+      const playerTurnStats = calculateTurnStats(events, "player");
+      const enemyTurnStats = calculateTurnStats(events, "enemy");
+      set((s) => {
+        s.ui.combatStats = aggregateStats(s.ui.combatStats, playerTurnStats);
+        s.ui.enemyCombatStats = aggregateStats(
+          s.ui.enemyCombatStats,
+          enemyTurnStats,
+        );
+      });
 
       finishTurn(nextTurnState);
     },
@@ -429,10 +468,7 @@ export const useGameStore = create<GameStore>()(
 
     updateCombatStats: (turnStats) =>
       set((state) => {
-        state.ui.combatStats = aggregateStats(
-          state.ui.combatStats,
-          turnStats,
-        );
+        state.ui.combatStats = aggregateStats(state.ui.combatStats, turnStats);
       }),
 
     toggleStatsOverlay: () =>
@@ -443,6 +479,7 @@ export const useGameStore = create<GameStore>()(
     resetCombatStats: () =>
       set((state) => {
         state.ui.combatStats = initialCombatStats;
+        state.ui.enemyCombatStats = initialCombatStats;
       }),
   })),
 );
