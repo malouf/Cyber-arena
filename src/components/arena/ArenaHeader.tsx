@@ -2,7 +2,7 @@ import type { EntityState, Soul } from "../../game/types";
 import type { ArenaPhase } from "./types";
 
 type Props = {
-  pSoul: Soul;
+  pSoul: Soul | null;
   playerStats: EntityState;
   simStats: { pa: number; pm: number; mana: number };
   enemyStats: EntityState;
@@ -56,7 +56,7 @@ export function ArenaHeader({
       <div className="flex gap-8 items-end">
         <div className="text-right">
           <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2 text-left">
-            Subject: {pSoul.name}
+            Subject: {pSoul?.name ?? "---"}
           </p>
           <div className="flex gap-4">
             <div>

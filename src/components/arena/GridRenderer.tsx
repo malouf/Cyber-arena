@@ -6,9 +6,10 @@ import type { Interactable } from "../../game/types";
 type Props = {
   buildPassives: Array<string>;
   interactables?: Array<Interactable>;
+  onCellClick?: (cell: { x: number; y: number }) => void;
 };
 
-export function GridRenderer({ buildPassives, interactables = [] }: Props) {
+export function GridRenderer({ buildPassives, interactables = [], onCellClick }: Props) {
   const playerPos = useGameStore((s) => s.server.player.pos);
   const enemyPos = useGameStore((s) => s.server.enemy.pos);
 
@@ -130,7 +131,10 @@ export function GridRenderer({ buildPassives, interactables = [] }: Props) {
               return (
                 <div
                   key={`${x}-${y}`}
-                  onClick={() => handleCellClick(cell, buildPassives)}
+                  onClick={() => {
+                    handleCellClick(cell, buildPassives);
+                    onCellClick?.(cell);
+                  }}
                   onMouseEnter={() => setHoveredCell(cell)}
                   onMouseLeave={() => setHoveredCell(null)}
                   style={hexStyle}
