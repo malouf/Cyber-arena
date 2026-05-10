@@ -8,9 +8,13 @@ export const posValidator = v.object({
 export const playerLoadoutValidator = v.object({
   primarySoul: v.string(),
   secondarySoul: v.string(),
-  selectedActives: v.array(v.string()),
-  selectedPassives: v.array(v.string()),
-  items: v.array(v.string()),
+  slots: v.array(
+    v.union(
+      v.object({ kind: v.literal("elite"), abilityId: v.string() }),
+      v.object({ kind: v.literal("active"), abilityId: v.string() }),
+      v.object({ kind: v.literal("passive"), passiveId: v.string() }),
+    ),
+  ),
 });
 
 export const entityStateValidator = v.object({
@@ -25,6 +29,7 @@ export const entityStateValidator = v.object({
   pos: posValidator,
   passives: v.array(v.string()),
   loadout: playerLoadoutValidator,
+  effects: v.array(v.any()),
 });
 
 export const validatedActionValidator = v.object({
@@ -38,6 +43,15 @@ export const validatedActionValidator = v.object({
   range: v.number(),
   name: v.string(),
   abilityId: v.optional(v.string()),
+  abilityType: v.optional(
+    v.union(
+      v.literal("attack"),
+      v.literal("move_attack"),
+      v.literal("trap"),
+      v.literal("buff"),
+      v.literal("control"),
+    ),
+  ),
 });
 
 export const combatEventValidator = v.union(
@@ -71,6 +85,25 @@ export const combatEventValidator = v.union(
     text: v.string(),
     color: v.string(),
     pos: posValidator,
+  }),
+  v.object({
+    type: v.literal("mitigation"),
+    entity: v.string(),
+    amount: v.number(),
+    source: v.string(),
+  }),
+  v.object({
+    type: v.literal("healing"),
+    entity: v.string(),
+    amount: v.number(),
+    source: v.string(),
+  }),
+  v.object({
+    type: v.literal("resource_change"),
+    entity: v.string(),
+    resource: v.union(v.literal("pa"), v.literal("pm"), v.literal("mana")),
+    amount: v.number(),
+    reason: v.string(),
   }),
 );
 

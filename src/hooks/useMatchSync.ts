@@ -4,25 +4,29 @@ import { api } from "../../convex/_generated/api";
 import { useGameStore } from "../components/arena/gameStore";
 import { useMultiplayerStore } from "../components/arena/multiplayerStore";
 import { soulData } from "../game/data";
-import type { LoadoutSlot, EntityState } from "../game/types";
+import type { CombatEvent, EntityState, LoadoutSlot } from "../game/types";
 
 type ServerMatchState = {
   playerState: EntityState & {
     loadout: {
       primarySoul: string;
       secondarySoul: string;
-      selectedActives: Array<string>;
-      selectedPassives: Array<string>;
-      items: Array<string>;
+      slots: Array<
+        | { kind: "elite"; abilityId: string }
+        | { kind: "active"; abilityId: string }
+        | { kind: "passive"; passiveId: string }
+      >;
     };
   };
   enemyState: EntityState & {
     loadout: {
       primarySoul: string;
       secondarySoul: string;
-      selectedActives: Array<string>;
-      selectedPassives: Array<string>;
-      items: Array<string>;
+      slots: Array<
+        | { kind: "elite"; abilityId: string }
+        | { kind: "active"; abilityId: string }
+        | { kind: "passive"; passiveId: string }
+      >;
     };
   };
   canSubmit: boolean;
@@ -32,61 +36,62 @@ type ServerMatchState = {
   phase: string;
   status: string;
   winner?: string;
-  latestEvents: Array<{
-    type: string;
-    [key: string]: unknown;
-  }>;
+  latestEvents: Array<CombatEvent>;
+  analytics: Record<
+    string,
+    {
+      damageDealt: number;
+      damageTaken: number;
+      healingDone: number;
+      shieldingDone: number;
+      damageMitigated: number;
+      resourceEfficiency: number;
+      interrupts: number;
+      distanceMoved: number;
+      actionsExecuted: number;
+      abilityBreakdown: Record<string, number>;
+    }
+  >;
+  yourSlot: string;
+  enemySlot: string | null;
 };
 
-function loadoutFromServer(serverLoadout: ServerMatchState["playerState"]["loadout"]): Array<LoadoutSlot> {
+function loadoutFromServer(
+  serverLoadout: ServerMatchState["playerState"]["loadout"],
+): Array<LoadoutSlot> {
   const loadout: Array<LoadoutSlot> = [];
-  
+
   const primary = serverLoadout.primarySoul as keyof typeof soulData;
   const secondary = serverLoadout.secondarySoul as keyof typeof soulData;
-  
-  if (!soulData[primary] || !soulData[secondary]) {
-    return loadout;
-  }
-  
+
   const pSoul = soulData[primary];
   const sSoul = soulData[secondary];
-  
-  // Elite slot (primary's ultimate)
-  loadout.push({ kind: "elite", ability: pSoul.ultimate });
-  
-  // Add selected actives
-  for (const activeId of serverLoadout.selectedActives) {
-    // Check primary soul actives
-    const pActive = pSoul.actives.find(a => a.id === activeId);
-    if (pActive) {
-      loadout.push({ kind: "active", ability: pActive });
-      continue;
-    }
-    // Check secondary soul actives
-    const sActive = sSoul.actives.find(a => a.id === activeId);
-    if (sActive) {
-      loadout.push({ kind: "active", ability: sActive });
-      continue;
-    }
-    // Check base attack
-    if (pSoul.baseAttack.id === activeId) {
-      loadout.push({ kind: "active", ability: pSoul.baseAttack });
-    }
-  }
-  
-  // Add selected passives
-  for (const passiveId of serverLoadout.selectedPassives) {
-    const pPassive = pSoul.passives.find(p => p.id === passiveId);
-    if (pPassive) {
-      loadout.push({ kind: "passive", passive: pPassive });
-      continue;
-    }
-    const sPassive = sSoul.passives.find(p => p.id === passiveId);
-    if (sPassive) {
-      loadout.push({ kind: "passive", passive: sPassive });
+
+  const allAbilities = [
+    pSoul.baseAttack,
+    pSoul.ultimate,
+    ...pSoul.actives,
+    sSoul.baseAttack,
+    sSoul.ultimate,
+    ...sSoul.actives,
+  ];
+
+  const allPassives = [...pSoul.passives, ...sSoul.passives];
+
+  for (const slot of serverLoadout.slots) {
+    if (slot.kind === "passive") {
+      const passive = allPassives.find((p) => p.id === slot.passiveId);
+      if (passive) {
+        loadout.push({ kind: "passive", passive });
+      }
+    } else {
+      const ability = allAbilities.find((a) => a.id === slot.abilityId);
+      if (ability) {
+        loadout.push({ kind: slot.kind, ability });
+      }
     }
   }
-  
+
   return loadout;
 }
 
@@ -96,67 +101,122 @@ export function useMatchSync(matchId: string | null, clientId: string | null) {
   const setPendingSubmit = useMultiplayerStore((s) => s.setPendingSubmit);
   const setLastSyncedTurn = useMultiplayerStore((s) => s.setLastSyncedTurn);
   const lastSyncedTurn = useMultiplayerStore((s) => s.lastSyncedTurn);
-  
+
   const matchState = useQuery(
     api.matches.getMatchState,
-    matchId && clientId ? { matchId, clientId } : "skip"
+    matchId && clientId ? { matchId, clientId } : "skip",
   ) as ServerMatchState | undefined;
-  
-  const syncToStore = useCallback((state: ServerMatchState) => {
-    // Convert server loadout format to local format
-    const playerLoadout = loadoutFromServer(state.playerState.loadout);
-    const enemyLoadout = loadoutFromServer(state.enemyState.loadout);
-    
-    // Create local entity states from server state
-    const playerEntity: EntityState = {
-      id: "player",
-      hp: state.playerState.hp,
-      maxHp: state.playerState.maxHp,
-      pa: state.playerState.pa,
-      maxPa: state.playerState.maxPa,
-      pm: state.playerState.pm,
-      maxPm: state.playerState.maxPm,
-      mana: state.playerState.mana,
-      maxMana: state.playerState.maxMana,
-      pos: state.playerState.pos,
-      passives: state.playerState.passives,
-      loadout: playerLoadout,
-      effects: state.playerState.effects || [],
-    };
-    
-    const enemyEntity: EntityState = {
-      id: "enemy",
-      hp: state.enemyState.hp,
-      maxHp: state.enemyState.maxHp,
-      pa: state.enemyState.pa,
-      maxPa: state.enemyState.maxPa,
-      pm: state.enemyState.pm,
-      maxPm: state.enemyState.maxPm,
-      mana: state.enemyState.mana,
-      maxMana: state.enemyState.maxMana,
-      pos: state.enemyState.pos,
-      passives: state.enemyState.passives,
-      loadout: enemyLoadout,
-      effects: state.enemyState.effects || [],
-    };
-    
-    initializeGame(playerEntity, enemyEntity);
-  }, [initializeGame]);
-  
+
+  const syncToStore = useCallback(
+    (state: ServerMatchState) => {
+      // Convert server loadout format to local format
+      const playerLoadout = loadoutFromServer(state.playerState.loadout);
+      const enemyLoadout = loadoutFromServer(state.enemyState.loadout);
+
+      // Create local entity states from server state
+      const playerEntity: EntityState = {
+        id: "player",
+        hp: state.playerState.hp,
+        maxHp: state.playerState.maxHp,
+        pa: state.playerState.pa,
+        maxPa: state.playerState.maxPa,
+        pm: state.playerState.pm,
+        maxPm: state.playerState.maxPm,
+        mana: state.playerState.mana,
+        maxMana: state.playerState.maxMana,
+        pos: state.playerState.pos,
+        passives: state.playerState.passives,
+        loadout: playerLoadout,
+        effects: state.playerState.effects,
+      };
+
+      const enemyEntity: EntityState = {
+        id: "enemy",
+        hp: state.enemyState.hp,
+        maxHp: state.enemyState.maxHp,
+        pa: state.enemyState.pa,
+        maxPa: state.enemyState.maxPa,
+        pm: state.enemyState.pm,
+        maxPm: state.enemyState.maxPm,
+        mana: state.enemyState.mana,
+        maxMana: state.enemyState.maxMana,
+        pos: state.enemyState.pos,
+        passives: state.enemyState.passives,
+        loadout: enemyLoadout,
+        effects: state.enemyState.effects,
+      };
+
+      initializeGame(playerEntity, enemyEntity);
+    },
+    [initializeGame],
+  );
+
   useEffect(() => {
     if (!matchState) return;
-    
+
     // Sync state to local store
     syncToStore(matchState);
-    
+
     // Detect new turn
     if (matchState.turnNumber !== lastSyncedTurn) {
+      // Use cumulative analytics from backend
+      const playerAn = matchState.analytics[matchState.yourSlot];
+      const enemyAn = matchState.enemySlot
+        ? matchState.analytics[matchState.enemySlot]
+        : null;
+
+      useGameStore.setState((s) => ({
+        ui: {
+          ...s.ui,
+          combatStats: {
+            ...s.ui.combatStats,
+            totalDamageDealt: playerAn.damageDealt,
+            totalDamageTaken: playerAn.damageTaken,
+            totalHealingDone: playerAn.healingDone,
+            totalShieldingDone: playerAn.shieldingDone,
+            totalDamageMitigated: playerAn.damageMitigated,
+            totalInterrupts: playerAn.interrupts,
+            totalDistanceMoved: playerAn.distanceMoved,
+            totalActionsExecuted: playerAn.actionsExecuted,
+            resourceEfficiency: playerAn.resourceEfficiency,
+            abilityBreakdown: playerAn.abilityBreakdown,
+            turnCount: matchState.turnNumber - 1,
+            dps: playerAn.damageDealt / Math.max(1, matchState.turnNumber - 1),
+          },
+          enemyCombatStats: enemyAn
+            ? {
+                ...s.ui.enemyCombatStats,
+                totalDamageDealt: enemyAn.damageDealt,
+                totalDamageTaken: enemyAn.damageTaken,
+                totalHealingDone: enemyAn.healingDone,
+                totalShieldingDone: enemyAn.shieldingDone,
+                totalDamageMitigated: enemyAn.damageMitigated,
+                totalInterrupts: enemyAn.interrupts,
+                totalDistanceMoved: enemyAn.distanceMoved,
+                totalActionsExecuted: enemyAn.actionsExecuted,
+                resourceEfficiency: enemyAn.resourceEfficiency,
+                abilityBreakdown: enemyAn.abilityBreakdown,
+                turnCount: matchState.turnNumber - 1,
+                dps:
+                  enemyAn.damageDealt / Math.max(1, matchState.turnNumber - 1),
+              }
+            : s.ui.enemyCombatStats,
+        },
+      }));
+
       setLastSyncedTurn(matchState.turnNumber);
       clearQueue();
       setPendingSubmit(false);
     }
-  }, [matchState, syncToStore, clearQueue, setPendingSubmit, setLastSyncedTurn, lastSyncedTurn]);
-  
+  }, [
+    matchState,
+    syncToStore,
+    clearQueue,
+    setPendingSubmit,
+    setLastSyncedTurn,
+    lastSyncedTurn,
+  ]);
+
   return {
     matchState,
     canSubmit: matchState?.canSubmit ?? false,

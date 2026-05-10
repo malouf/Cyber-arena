@@ -348,17 +348,19 @@ export const useGameStore = create<GameStore>()(
           return;
         }
 
-        const entity = event.entity;
-        if (entity === "player") {
-          if (event.hp !== undefined) state.server.player.hp = event.hp;
-          if (event.pa !== undefined) state.server.player.pa = event.pa;
-          if (event.pm !== undefined) state.server.player.pm = event.pm;
-          if (event.mana !== undefined) state.server.player.mana = event.mana;
-        } else {
-          if (event.hp !== undefined) state.server.enemy.hp = event.hp;
-          if (event.pa !== undefined) state.server.enemy.pa = event.pa;
-          if (event.pm !== undefined) state.server.enemy.pm = event.pm;
-          if (event.mana !== undefined) state.server.enemy.mana = event.mana;
+        if (event.type === "stats") {
+          const entity = event.entity;
+          if (entity === "player") {
+            if (event.hp !== undefined) state.server.player.hp = event.hp;
+            if (event.pa !== undefined) state.server.player.pa = event.pa;
+            if (event.pm !== undefined) state.server.player.pm = event.pm;
+            if (event.mana !== undefined) state.server.player.mana = event.mana;
+          } else {
+            if (event.hp !== undefined) state.server.enemy.hp = event.hp;
+            if (event.pa !== undefined) state.server.enemy.pa = event.pa;
+            if (event.pm !== undefined) state.server.enemy.pm = event.pm;
+            if (event.mana !== undefined) state.server.enemy.mana = event.mana;
+          }
         }
         state.ui.phase = nextUiPhase;
       }),

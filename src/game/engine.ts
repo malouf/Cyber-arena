@@ -138,6 +138,12 @@ export function resolveTurn(
       if (shield.value !== undefined) shield.value -= absorbed;
       finalDamage -= absorbed;
       events.push({
+        type: "mitigation",
+        entity: target,
+        amount: absorbed,
+        source: "Shield",
+      });
+      events.push({
         type: "log",
         text: `> Shield absorbed ${absorbed} damage!`,
       });
@@ -152,6 +158,12 @@ export function resolveTurn(
       if (pStats.passives.includes("heavy_plating")) {
         const mitigated = Math.min(3, finalDamage);
         finalDamage = Math.max(0, finalDamage - 3);
+        events.push({
+          type: "mitigation",
+          entity: "player",
+          amount: mitigated,
+          source: "Heavy Plating",
+        });
         events.push({
           type: "log",
           text: `> Heavy Plating mitigated ${mitigated} damage!`,
@@ -265,6 +277,13 @@ export function resolveTurn(
             if (int.type === "mana_well") {
               pStats.mana = Math.min(pStats.maxMana, pStats.mana + int.value);
               events.push({
+                type: "resource_change",
+                entity: "player",
+                resource: "mana",
+                amount: int.value,
+                reason: "Mana Well",
+              });
+              events.push({
                 type: "log",
                 text: `> Mana Well restored ${int.value} Mana!`,
               });
@@ -345,6 +364,14 @@ export function resolveTurn(
           const dist = getDistance(myPos, hisPos);
           if (dist <= 1) {
             applyDamage(isPlayer ? "enemy" : "player", dmg, true);
+            events.push({
+              type: "attack",
+              entity: isPlayer ? "player" : "enemy",
+              target: hisPos,
+              hit: true,
+              damage: dmg,
+              abilityName: ability.name,
+            });
             if (ability.effect)
               applyEffect(isPlayer ? "enemy" : "player", ability.effect);
             events.push({
@@ -352,6 +379,14 @@ export function resolveTurn(
               text: `> ${ability.name} hits for ${dmg} DMG.`,
             });
           } else {
+            events.push({
+              type: "attack",
+              entity: isPlayer ? "player" : "enemy",
+              target: hisPos,
+              hit: false,
+              damage: 0,
+              abilityName: ability.name,
+            });
             events.push({
               type: "log",
               text: `> ${ability.name} hits nothing.`,
@@ -439,11 +474,28 @@ export function resolveTurn(
               finalResonanceDmg,
               false,
             );
+            events.push({
+              type: "attack",
+              entity: isPlayer ? "player" : "enemy",
+              target: targetPos,
+              hit: true,
+              damage: finalResonanceDmg,
+              abilityName: ability.name,
+            });
             if (ability.effect)
               applyEffect(isPlayer ? "enemy" : "player", ability.effect);
             events.push({
               type: "log",
               text: `> Resonance hits for ${finalResonanceDmg} DMG! (+${bonusDmg} from movement)`,
+            });
+          } else {
+            events.push({
+              type: "attack",
+              entity: isPlayer ? "player" : "enemy",
+              target: targetPos,
+              hit: false,
+              damage: 0,
+              abilityName: ability.name,
             });
           }
           continue;
@@ -460,6 +512,14 @@ export function resolveTurn(
             ePos = { x: ePos.x + dx, y: ePos.y + dy };
             events.push({ type: "move", entity: "enemy", pos: { ...ePos } });
             applyDamage("enemy", dmg, false);
+            events.push({
+              type: "attack",
+              entity: "player",
+              target: targetPos,
+              hit: true,
+              damage: dmg,
+              abilityName: ability.name,
+            });
             if (ability.effect) applyEffect("enemy", ability.effect);
             events.push({
               type: "log",
@@ -529,6 +589,14 @@ export function resolveTurn(
           );
           if (newDist <= 1) {
             applyDamage(isPlayer ? "enemy" : "player", dmg, true);
+            events.push({
+              type: "attack",
+              entity: isPlayer ? "player" : "enemy",
+              target: isPlayer ? ePos : pPos,
+              hit: true,
+              damage: dmg,
+              abilityName: ability.name,
+            });
             if (ability.effect)
               applyEffect(isPlayer ? "enemy" : "player", ability.effect);
             events.push({
@@ -536,6 +604,14 @@ export function resolveTurn(
               text: `> ${ability.name} hits for ${dmg} DMG.`,
             });
           } else {
+            events.push({
+              type: "attack",
+              entity: isPlayer ? "player" : "enemy",
+              target: isPlayer ? ePos : pPos,
+              hit: false,
+              damage: 0,
+              abilityName: ability.name,
+            });
             events.push({
               type: "log",
               text: `> No adjacent targets for ${ability.name}.`,
@@ -549,6 +625,14 @@ export function resolveTurn(
             ) {
               if (isPlayer) {
                 applyDamage("enemy", dmg, currentDist <= 1);
+                events.push({
+                  type: "attack",
+                  entity: "player",
+                  target: action.target,
+                  hit: true,
+                  damage: dmg,
+                  abilityName: ability.name,
+                });
                 if (ability.effect) applyEffect("enemy", ability.effect);
                 events.push({
                   type: "log",
@@ -556,6 +640,14 @@ export function resolveTurn(
                 });
               } else {
                 applyDamage("player", dmg, currentDist <= 1);
+                events.push({
+                  type: "attack",
+                  entity: "enemy",
+                  target: action.target,
+                  hit: true,
+                  damage: dmg,
+                  abilityName: ability.name,
+                });
                 if (ability.effect) applyEffect("player", ability.effect);
                 events.push({
                   type: "log",

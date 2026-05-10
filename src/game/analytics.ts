@@ -11,10 +11,13 @@ export function calculateTurnStats(
     damageDealt: 0,
     damageTaken: 0,
     healingDone: 0,
+    shieldingDone: 0,
     manaSpent: 0,
     actionsExecuted: 0,
     distanceMoved: 0,
     damageMitigated: 0,
+    interrupts: 0,
+    abilityBreakdown: {},
   };
 
   let prevMana: number | null = null;
@@ -63,6 +66,26 @@ export function calculateTurnStats(
         }
         break;
 
+      case "mitigation":
+        if (event.entity === entityId) {
+          stats.damageMitigated += event.amount;
+        }
+        break;
+
+      case "healing":
+        if (event.entity === entityId) {
+          stats.healingDone += event.amount;
+        }
+        break;
+
+      case "attack":
+        if (event.entity === entityId && event.hit) {
+          const abilityName = event.abilityName || "Basic Attack";
+          stats.abilityBreakdown[abilityName] =
+            (stats.abilityBreakdown[abilityName] || 0) + event.damage;
+        }
+        break;
+
       case "log":
         if (
           event.text.includes("mitigated") &&
@@ -106,16 +129,29 @@ export function aggregateStats(
     totalDamageDealt: previous.totalDamageDealt + turnStats.damageDealt,
     totalDamageTaken: previous.totalDamageTaken + turnStats.damageTaken,
     totalHealingDone: previous.totalHealingDone + turnStats.healingDone,
+    totalShieldingDone:
+      (previous.totalShieldingDone || 0) + (turnStats.shieldingDone || 0),
     totalManaSpent: previous.totalManaSpent + turnStats.manaSpent,
     totalActionsExecuted:
       previous.totalActionsExecuted + turnStats.actionsExecuted,
     totalDistanceMoved: previous.totalDistanceMoved + turnStats.distanceMoved,
     totalDamageMitigated:
       previous.totalDamageMitigated + turnStats.damageMitigated,
+    totalInterrupts:
+      (previous.totalInterrupts || 0) + (turnStats.interrupts || 0),
     turnCount: previous.turnCount + 1,
     dps: 0,
     effectiveDamage: 0,
+    abilityBreakdown: { ...previous.abilityBreakdown },
   };
+
+  // Aggregate ability breakdown
+  for (const [abilityId, damage] of Object.entries(
+    turnStats.abilityBreakdown,
+  )) {
+    newTotal.abilityBreakdown[abilityId] =
+      (newTotal.abilityBreakdown[abilityId] || 0) + damage;
+  }
 
   // Calculate DPS (damage per turn)
   if (newTotal.turnCount > 0) {
@@ -140,6 +176,7 @@ export const initialCombatStats: CombatStats = {
   turnCount: 0,
   dps: 0,
   effectiveDamage: 0,
+  abilityBreakdown: {},
 };
 
 /**
