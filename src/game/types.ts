@@ -1,8 +1,15 @@
-export type SoulId = "onde" | "fury" | "aegis";
+export type SoulId = "onde" | "fury" | "aegis" | "umbra" | "verdant" | "volt";
 
 export type Pos = { x: number; y: number };
 
-export type StatusEffectType = "stun" | "dot" | "shield" | "buff" | "debuff";
+export type StatusEffectType =
+  | "stun"
+  | "dot"
+  | "shield"
+  | "buff"
+  | "debuff"
+  | "root"
+  | "stealth";
 
 export type StatusEffect = {
   id: string;
@@ -38,7 +45,12 @@ export type Passive = {
     | "drain_force"
     | "flow_state"
     | "thorns"
-    | "heavy_plating";
+    | "heavy_plating"
+    | "opportunist"
+    | "shadow_step"
+    | "root_system"
+    | "supercharged"
+    | "conductivity";
 };
 
 export type Soul = {
@@ -85,7 +97,15 @@ export type EntityState = {
   effects: Array<StatusEffect>;
 };
 
-export type InteractableType = "mana_well" | "item" | "trap" | "wall";
+export type InteractableType =
+  | "mana_well"
+  | "item"
+  | "trap"
+  | "wall"
+  | "hp_pack"
+  | "mana_pack"
+  | "pa_boost"
+  | "pm_boost";
 
 export type Interactable = {
   id: string;
@@ -156,6 +176,7 @@ export type TurnState = {
   usesThisTurn: Record<string, number>;
   flowStateRange: number;
   bonusPa: number;
+  bonusPm: number;
   isRestTurn: boolean;
 };
 

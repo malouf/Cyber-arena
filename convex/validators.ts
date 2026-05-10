@@ -26,6 +26,8 @@ export const entityStateValidator = v.object({
   maxPm: v.number(),
   mana: v.number(),
   maxMana: v.number(),
+  bonusPa: v.optional(v.number()),
+  bonusPm: v.optional(v.number()),
   pos: posValidator,
   passives: v.array(v.string()),
   loadout: playerLoadoutValidator,
@@ -115,7 +117,15 @@ export const playerStateInMatchValidator = v.object({
 });
 
 export const mapObjectValidator = v.object({
-  type: v.union(v.literal("hp"), v.literal("mana"), v.literal("buff")),
+  type: v.union(
+    v.literal("hp_pack"),
+    v.literal("mana_pack"),
+    v.literal("pa_boost"),
+    v.literal("pm_boost"),
+    v.literal("hp"),
+    v.literal("mana"),
+    v.literal("buff"),
+  ),
   pos: posValidator,
   value: v.number(),
   collected: v.boolean(),

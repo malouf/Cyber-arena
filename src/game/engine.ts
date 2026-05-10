@@ -57,6 +57,7 @@ export function resolveTurn(
   const pStats = {
     ...pState,
     pa: pState.pa + turnState.bonusPa + (isRestTurn ? 1 : 0),
+    pm: pState.pm + turnState.bonusPm,
     effects: pState.effects.map((e) => ({ ...e })),
   };
   const eStats = {
@@ -69,8 +70,11 @@ export function resolveTurn(
   const newCooldowns = { ...turnState.cooldowns };
   const newUses = { ...turnState.usesThisTurn };
   let cellsMovedThisTurn = 0;
+  let manaSpentThisTurn = 0;
   let nextBonusPa = 0;
+  let nextBonusPm = 0;
   let nextFlowStateRange = 0;
+  let hasShadowStepActive = false;
 
   events.push({ type: "log", text: "> INITIATING SEQUENCE RESOLUTION" });
 
@@ -126,9 +130,30 @@ export function resolveTurn(
     target: "player" | "enemy",
     amount: number,
     isMelee: boolean,
+    attacker: "player" | "enemy" = "enemy",
   ) => {
     const stats = target === "player" ? pStats : eStats;
     let finalDamage = amount;
+
+    // Passive: Opportunist
+    if (attacker === "player" && pStats.passives.includes("opportunist")) {
+      if (eStats.hp < eStats.maxHp / 2) {
+        finalDamage += 5;
+        events.push({ type: "log", text: `> Opportunist: +5 DMG!` });
+      }
+    }
+
+    // Passive: Conductivity
+    if (attacker === "player" && pStats.passives.includes("conductivity")) {
+      const onWell = interactables.some(
+        (i) =>
+          i.type === "mana_well" && i.pos.x === ePos.x && i.pos.y === ePos.y,
+      );
+      if (onWell) {
+        finalDamage += 5;
+        events.push({ type: "log", text: `> Conductivity: +5 DMG!` });
+      }
+    }
 
     // Shield check
     const shieldIndex = stats.effects.findIndex((e) => e.type === "shield");
@@ -255,11 +280,30 @@ export function resolveTurn(
       const targetPos = isPlayer ? ePos : pPos;
 
       if (action.type === "move") {
+        if (stats.effects.some((e) => e.type === "root")) {
+          events.push({
+            type: "log",
+            text: `> ${isPlayer ? "Player" : "Enemy"} is ROOTED and cannot move!`,
+          });
+          continue;
+        }
+
         if (isPlayer) {
           const startPos = pPos;
-          cellsMovedThisTurn += getDistance(startPos, action.target);
+          const dist = getDistance(startPos, action.target);
+          cellsMovedThisTurn += dist;
           pPos = action.target;
-          pStats.pm -= action.pmCost;
+
+          if (hasShadowStepActive) {
+            events.push({
+              type: "log",
+              text: `> Shadow Step: 0 PM move!`,
+            });
+            hasShadowStepActive = false;
+          } else {
+            pStats.pm -= action.pmCost;
+          }
+
           pStats.pa -= action.paCost;
           pStats.mana -= action.manaCost;
           events.push({ type: "move", entity: "player", pos: { ...pPos } });
@@ -298,6 +342,62 @@ export function resolveTurn(
                 interactableId: int.id,
                 interactableType: int.type,
               });
+            } else if (int.type === "hp_pack") {
+              const heal = Math.min(pStats.maxHp - pStats.hp, int.value);
+              pStats.hp += heal;
+              int.duration = 0; // Consume
+              events.push({
+                type: "healing",
+                entity: "player",
+                amount: heal,
+                source: "Health Pack",
+              });
+              events.push({
+                type: "log",
+                text: `> Health Pack restored ${heal} HP!`,
+              });
+              events.push({
+                type: "stats",
+                entity: "player",
+                hp: pStats.hp,
+              });
+            } else if (int.type === "mana_pack") {
+              const manaRestored = Math.min(
+                pStats.maxMana - pStats.mana,
+                int.value,
+              );
+              pStats.mana += manaRestored;
+              int.duration = 0; // Consume
+              events.push({
+                type: "resource_change",
+                entity: "player",
+                resource: "mana",
+                amount: manaRestored,
+                reason: "Mana Pack",
+              });
+              events.push({
+                type: "log",
+                text: `> Mana Pack restored ${manaRestored} Mana!`,
+              });
+              events.push({
+                type: "stats",
+                entity: "player",
+                mana: pStats.mana,
+              });
+            } else if (int.type === "pa_boost") {
+              nextBonusPa += int.value;
+              int.duration = 0;
+              events.push({
+                type: "log",
+                text: `> PA Boost! +${int.value} PA next turn.`,
+              });
+            } else if (int.type === "pm_boost") {
+              nextBonusPm += int.value;
+              int.duration = 0;
+              events.push({
+                type: "log",
+                text: `> PM Boost! +${int.value} PM next turn.`,
+              });
             }
           }
         } else {
@@ -315,6 +415,20 @@ export function resolveTurn(
                 interactableId: int.id,
                 interactableType: int.type,
               });
+            } else if (int.type === "hp_pack") {
+              const heal = Math.min(eStats.maxHp - eStats.hp, int.value);
+              eStats.hp += heal;
+              int.duration = 0;
+              events.push({
+                type: "healing",
+                entity: "enemy",
+                amount: heal,
+                source: "Health Pack",
+              });
+              events.push({ type: "stats", entity: "enemy", hp: eStats.hp });
+            } else if (int.type === "mana_pack") {
+              eStats.mana = Math.min(eStats.maxMana, eStats.mana + int.value);
+              int.duration = 0;
             }
           }
         }
@@ -327,6 +441,12 @@ export function resolveTurn(
           pStats.pm -= action.pmCost;
           pStats.pa -= action.paCost;
           pStats.mana -= action.manaCost;
+          manaSpentThisTurn += action.manaCost;
+
+          if (pStats.passives.includes("shadow_step")) {
+            hasShadowStepActive = true;
+          }
+
           events.push({
             type: "stats",
             entity: "player",
@@ -360,10 +480,73 @@ export function resolveTurn(
         }
 
         // --- SPECIAL ABILITIES ---
+        if (ability.id === "blink") {
+          if (isPlayer) {
+            pPos = action.target;
+            events.push({ type: "move", entity: "player", pos: { ...pPos } });
+          } else {
+            ePos = action.target;
+            events.push({ type: "move", entity: "enemy", pos: { ...ePos } });
+          }
+          events.push({
+            type: "log",
+            text: `> ${ability.name} teleports ${isPlayer ? "Player" : "Enemy"} to [${action.target.x}, ${action.target.y}]!`,
+          });
+          if (isPlayer && pStats.passives.includes("shadow_step")) {
+            hasShadowStepActive = true;
+          }
+          continue;
+        }
+
+        if (ability.id === "bloom") {
+          const heal = 20;
+          if (isPlayer) {
+            pStats.hp = Math.min(pStats.maxHp, pStats.hp + heal);
+            events.push({
+              type: "healing",
+              entity: "player",
+              amount: heal,
+              source: "Healing Bloom",
+            });
+            events.push({ type: "stats", entity: "player", hp: pStats.hp });
+          } else {
+            eStats.hp = Math.min(eStats.maxHp, eStats.hp + heal);
+            events.push({
+              type: "healing",
+              entity: "enemy",
+              amount: heal,
+              source: "Healing Bloom",
+            });
+            events.push({ type: "stats", entity: "enemy", hp: eStats.hp });
+          }
+          events.push({
+            type: "log",
+            text: `> ${ability.name} heals for ${heal} HP!`,
+          });
+          continue;
+        }
+
+        if (ability.id === "overload") {
+          if (isPlayer) {
+            nextBonusPa += 2;
+            nextBonusPm += 2;
+          }
+          events.push({
+            type: "log",
+            text: `> ${ability.name} supercharges for next turn!`,
+          });
+          continue;
+        }
+
         if (ability.id === "whirlwind") {
           const dist = getDistance(myPos, hisPos);
           if (dist <= 1) {
-            applyDamage(isPlayer ? "enemy" : "player", dmg, true);
+            applyDamage(
+              isPlayer ? "enemy" : "player",
+              dmg,
+              true,
+              isPlayer ? "player" : "enemy",
+            );
             events.push({
               type: "attack",
               entity: isPlayer ? "player" : "enemy",
@@ -473,6 +656,7 @@ export function resolveTurn(
               isPlayer ? "enemy" : "player",
               finalResonanceDmg,
               false,
+              isPlayer ? "player" : "enemy",
             );
             events.push({
               type: "attack",
@@ -511,7 +695,7 @@ export function resolveTurn(
             const dy = ePos.y > pPos.y ? 1 : ePos.y < pPos.y ? -1 : 0;
             ePos = { x: ePos.x + dx, y: ePos.y + dy };
             events.push({ type: "move", entity: "enemy", pos: { ...ePos } });
-            applyDamage("enemy", dmg, false);
+            applyDamage("enemy", dmg, false, "player");
             events.push({
               type: "attack",
               entity: "player",
@@ -588,7 +772,12 @@ export function resolveTurn(
             isPlayer ? ePos : pPos,
           );
           if (newDist <= 1) {
-            applyDamage(isPlayer ? "enemy" : "player", dmg, true);
+            applyDamage(
+              isPlayer ? "enemy" : "player",
+              dmg,
+              true,
+              isPlayer ? "player" : "enemy",
+            );
             events.push({
               type: "attack",
               entity: isPlayer ? "player" : "enemy",
@@ -624,7 +813,7 @@ export function resolveTurn(
               action.target.y === targetPos.y
             ) {
               if (isPlayer) {
-                applyDamage("enemy", dmg, currentDist <= 1);
+                applyDamage("enemy", dmg, currentDist <= 1, "player");
                 events.push({
                   type: "attack",
                   entity: "player",
@@ -639,7 +828,7 @@ export function resolveTurn(
                   text: `> ${ability.name} hits Enemy! ${dmg} DMG.`,
                 });
               } else {
-                applyDamage("player", dmg, currentDist <= 1);
+                applyDamage("player", dmg, currentDist <= 1, "enemy");
                 events.push({
                   type: "attack",
                   entity: "enemy",
@@ -679,8 +868,32 @@ export function resolveTurn(
     });
   }
 
+  // Passive: Root System
+  if (pStats.passives.includes("root_system") && cellsMovedThisTurn === 0) {
+    const heal = 5;
+    pStats.hp = Math.min(pStats.maxHp, pStats.hp + heal);
+    events.push({
+      type: "healing",
+      entity: "player",
+      amount: heal,
+      source: "Root System",
+    });
+    events.push({ type: "stats", entity: "player", hp: pStats.hp });
+    events.push({ type: "log", text: `> Root System: Healed 5 HP!` });
+  }
+
+  // Passive: Supercharged
+  if (pStats.passives.includes("supercharged") && manaSpentThisTurn >= 2) {
+    nextBonusPm += 1;
+    events.push({
+      type: "log",
+      text: `> Supercharged: +1 PM for next turn!`,
+    });
+  }
+
   // Update interactable durations and remove expired ones
   const updatedInteractables = interactables.filter((i) => {
+    if (i.duration === 0) return false;
     if (i.duration > 0) {
       i.duration -= 1;
       return i.duration !== 0;
@@ -722,6 +935,7 @@ export function resolveTurn(
       usesThisTurn: {},
       flowStateRange: nextFlowStateRange,
       bonusPa: nextBonusPa,
+      bonusPm: nextBonusPm,
       isRestTurn: false,
     },
     interactables: updatedInteractables,

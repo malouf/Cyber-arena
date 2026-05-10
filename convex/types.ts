@@ -1,4 +1,4 @@
-export type SoulId = "onde" | "fury" | "aegis";
+export type SoulId = "onde" | "fury" | "aegis" | "umbra" | "verdant" | "volt";
 
 export type Ability = {
   id: string;
