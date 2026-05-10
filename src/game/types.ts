@@ -163,10 +163,12 @@ export type TurnStats = {
   damageDealt: number;
   damageTaken: number;
   healingDone: number;
+  shieldingDone?: number;
   manaSpent: number;
   actionsExecuted: number;
   distanceMoved: number;
   damageMitigated: number;
+  interrupts?: number;
   abilityBreakdown: Record<string, number>;
 };
 
@@ -174,10 +176,13 @@ export type CombatStats = {
   totalDamageDealt: number;
   totalDamageTaken: number;
   totalHealingDone: number;
+  totalShieldingDone?: number;
   totalManaSpent: number;
   totalActionsExecuted: number;
   totalDistanceMoved: number;
   totalDamageMitigated: number;
+  totalInterrupts?: number;
+  resourceEfficiency?: number;
   turnCount: number;
   dps: number;
   effectiveDamage: number;

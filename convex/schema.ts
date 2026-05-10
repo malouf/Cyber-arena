@@ -91,6 +91,8 @@ export default defineSchema({
     damageMitigated: v.number(),
     resourceEfficiency: v.number(),
     interrupts: v.number(),
+    distanceMoved: v.number(),
+    actionsExecuted: v.number(),
     abilityBreakdown: v.record(v.string(), v.number()),
   }).index("by_matchId", ["matchId"]),
 });

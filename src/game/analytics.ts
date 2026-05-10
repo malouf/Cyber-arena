@@ -11,10 +11,12 @@ export function calculateTurnStats(
     damageDealt: 0,
     damageTaken: 0,
     healingDone: 0,
+    shieldingDone: 0,
     manaSpent: 0,
     actionsExecuted: 0,
     distanceMoved: 0,
     damageMitigated: 0,
+    interrupts: 0,
     abilityBreakdown: {},
   };
 
@@ -127,12 +129,16 @@ export function aggregateStats(
     totalDamageDealt: previous.totalDamageDealt + turnStats.damageDealt,
     totalDamageTaken: previous.totalDamageTaken + turnStats.damageTaken,
     totalHealingDone: previous.totalHealingDone + turnStats.healingDone,
+    totalShieldingDone:
+      (previous.totalShieldingDone || 0) + (turnStats.shieldingDone || 0),
     totalManaSpent: previous.totalManaSpent + turnStats.manaSpent,
     totalActionsExecuted:
       previous.totalActionsExecuted + turnStats.actionsExecuted,
     totalDistanceMoved: previous.totalDistanceMoved + turnStats.distanceMoved,
     totalDamageMitigated:
       previous.totalDamageMitigated + turnStats.damageMitigated,
+    totalInterrupts:
+      (previous.totalInterrupts || 0) + (turnStats.interrupts || 0),
     turnCount: previous.turnCount + 1,
     dps: 0,
     effectiveDamage: 0,

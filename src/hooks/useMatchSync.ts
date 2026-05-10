@@ -4,7 +4,7 @@ import { api } from "../../convex/_generated/api";
 import { useGameStore } from "../components/arena/gameStore";
 import { useMultiplayerStore } from "../components/arena/multiplayerStore";
 import { soulData } from "../game/data";
-import type { EntityState, LoadoutSlot } from "../game/types";
+import type { CombatEvent, EntityState, LoadoutSlot } from "../game/types";
 
 type ServerMatchState = {
   playerState: EntityState & {
@@ -36,10 +36,24 @@ type ServerMatchState = {
   phase: string;
   status: string;
   winner?: string;
-  latestEvents: Array<{
-    type: string;
-    [key: string]: unknown;
-  }>;
+  latestEvents: Array<CombatEvent>;
+  analytics: Record<
+    string,
+    {
+      damageDealt: number;
+      damageTaken: number;
+      healingDone: number;
+      shieldingDone: number;
+      damageMitigated: number;
+      resourceEfficiency: number;
+      interrupts: number;
+      distanceMoved: number;
+      actionsExecuted: number;
+      abilityBreakdown: Record<string, number>;
+    }
+  >;
+  yourSlot: string;
+  enemySlot: string | null;
 };
 
 function loadoutFromServer(
@@ -145,6 +159,51 @@ export function useMatchSync(matchId: string | null, clientId: string | null) {
 
     // Detect new turn
     if (matchState.turnNumber !== lastSyncedTurn) {
+      // Use cumulative analytics from backend
+      const playerAn = matchState.analytics[matchState.yourSlot];
+      const enemyAn = matchState.enemySlot
+        ? matchState.analytics[matchState.enemySlot]
+        : null;
+
+      useGameStore.setState((s) => ({
+        ui: {
+          ...s.ui,
+          combatStats: {
+            ...s.ui.combatStats,
+            totalDamageDealt: playerAn.damageDealt,
+            totalDamageTaken: playerAn.damageTaken,
+            totalHealingDone: playerAn.healingDone,
+            totalShieldingDone: playerAn.shieldingDone,
+            totalDamageMitigated: playerAn.damageMitigated,
+            totalInterrupts: playerAn.interrupts,
+            totalDistanceMoved: playerAn.distanceMoved,
+            totalActionsExecuted: playerAn.actionsExecuted,
+            resourceEfficiency: playerAn.resourceEfficiency,
+            abilityBreakdown: playerAn.abilityBreakdown,
+            turnCount: matchState.turnNumber - 1,
+            dps: playerAn.damageDealt / Math.max(1, matchState.turnNumber - 1),
+          },
+          enemyCombatStats: enemyAn
+            ? {
+                ...s.ui.enemyCombatStats,
+                totalDamageDealt: enemyAn.damageDealt,
+                totalDamageTaken: enemyAn.damageTaken,
+                totalHealingDone: enemyAn.healingDone,
+                totalShieldingDone: enemyAn.shieldingDone,
+                totalDamageMitigated: enemyAn.damageMitigated,
+                totalInterrupts: enemyAn.interrupts,
+                totalDistanceMoved: enemyAn.distanceMoved,
+                totalActionsExecuted: enemyAn.actionsExecuted,
+                resourceEfficiency: enemyAn.resourceEfficiency,
+                abilityBreakdown: enemyAn.abilityBreakdown,
+                turnCount: matchState.turnNumber - 1,
+                dps:
+                  enemyAn.damageDealt / Math.max(1, matchState.turnNumber - 1),
+              }
+            : s.ui.enemyCombatStats,
+        },
+      }));
+
       setLastSyncedTurn(matchState.turnNumber);
       clearQueue();
       setPendingSubmit(false);

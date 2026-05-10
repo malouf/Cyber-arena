@@ -81,6 +81,8 @@ export function resolveMatchTurn(
       damageMitigated: 0,
       resourceEfficiency: 0,
       interrupts: 0,
+      distanceMoved: 0,
+      actionsExecuted: 0,
       abilityBreakdown: {},
     };
   });
@@ -114,10 +116,13 @@ export function resolveMatchTurn(
       const totalCost = action.paCost + action.pmCost + action.manaCost * 2;
 
       if (action.type === "move") {
+        const dist = getDistance(actor.state.pos, action.target);
         actor.state.pm -= action.pmCost;
         actor.state.pa -= action.paCost;
         actor.state.mana -= action.manaCost;
         actor.state.pos = action.target;
+        analytics[slot].distanceMoved += dist;
+        analytics[slot].actionsExecuted += 1;
 
         events.push({
           type: "move",
@@ -182,6 +187,7 @@ export function resolveMatchTurn(
         actor.state.pm -= action.pmCost;
         actor.state.pa -= action.paCost;
         actor.state.mana -= action.manaCost;
+        analytics[slot].actionsExecuted += 1;
 
         const targetPos = action.target;
         const targetPlayer = currentPlayers.find(

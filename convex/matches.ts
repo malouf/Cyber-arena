@@ -230,6 +230,7 @@ export const getMatchState = query({
     timeoutMs: v.number(),
     type: v.union(v.literal("casual"), v.literal("strategic")),
     yourSlot: v.string(),
+    enemySlot: v.union(v.string(), v.null()),
     playerState: entityStateValidator,
     enemyState: entityStateValidator,
     player1Submitted: v.boolean(),
@@ -237,6 +238,21 @@ export const getMatchState = query({
     submittedSlots: v.array(v.string()),
     canSubmit: v.boolean(),
     latestEvents: v.array(combatEventValidator),
+    analytics: v.record(
+      v.string(),
+      v.object({
+        damageDealt: v.number(),
+        damageTaken: v.number(),
+        healingDone: v.number(),
+        shieldingDone: v.number(),
+        damageMitigated: v.number(),
+        resourceEfficiency: v.number(),
+        interrupts: v.number(),
+        distanceMoved: v.number(),
+        actionsExecuted: v.number(),
+        abilityBreakdown: v.record(v.string(), v.number()),
+      }),
+    ),
   }),
   handler: async (ctx: any, args: any) => {
     const match = await ctx.db.get("matches", args.matchId);
@@ -267,6 +283,46 @@ export const getMatchState = query({
             .unique()
         : null;
 
+    const allAnalytics = await ctx.db
+      .query("analytics")
+      .withIndex("by_matchId", (q: any) => q.eq("matchId", args.matchId))
+      .collect();
+
+    const cumulativeAnalytics: Record<string, any> = {};
+    allAnalytics.forEach((a: any) => {
+      if (!cumulativeAnalytics[a.playerSlot]) {
+        cumulativeAnalytics[a.playerSlot] = {
+          damageDealt: 0,
+          damageTaken: 0,
+          healingDone: 0,
+          shieldingDone: 0,
+          damageMitigated: 0,
+          resourceEfficiency: 0,
+          interrupts: 0,
+          distanceMoved: 0,
+          actionsExecuted: 0,
+          abilityBreakdown: {},
+        };
+      }
+      const curr = cumulativeAnalytics[a.playerSlot];
+      curr.damageDealt += a.damageDealt;
+      curr.damageTaken += a.damageTaken;
+      curr.healingDone += a.healingDone;
+      curr.shieldingDone += a.shieldingDone;
+      curr.damageMitigated += a.damageMitigated;
+      curr.interrupts += a.interrupts;
+      curr.distanceMoved += a.distanceMoved;
+      curr.actionsExecuted += a.actionsExecuted;
+      // Average resource efficiency or just use the latest? Summing is not quite right for efficiency.
+      curr.resourceEfficiency = a.resourceEfficiency;
+
+      for (const [abilityId, damage] of Object.entries(a.abilityBreakdown)) {
+        curr.abilityBreakdown[abilityId] =
+          ((curr.abilityBreakdown[abilityId] as number) || 0) +
+          (damage as number);
+      }
+    });
+
     return {
       matchId: match._id,
       status: match.status,
@@ -281,6 +337,7 @@ export const getMatchState = query({
       timeoutMs: match.timeoutMs,
       type: match.type,
       yourSlot: player.slot,
+      enemySlot: enemy?.slot ?? null,
       playerState: player.state,
       enemyState: enemy?.state ?? player.state,
       player1Submitted: submittedSlots.includes("team1_0"),
@@ -289,6 +346,7 @@ export const getMatchState = query({
       canSubmit:
         match.status === "active" && !submittedSlots.includes(player.slot),
       latestEvents: latestEventsRecord?.events ?? [],
+      analytics: cumulativeAnalytics,
     };
   },
 });
@@ -355,11 +413,12 @@ export const submitTurn = mutation({
           name: "Move",
         });
       } else {
-        // Find ability in soul data
+        // Find ability in loadout
+        const loadout = player.state.loadout;
         const primarySoul =
-          soulData[player.state.loadout.primarySoul as keyof typeof soulData];
+          soulData[loadout.primarySoul as keyof typeof soulData];
         const secondarySoul =
-          soulData[player.state.loadout.secondarySoul as keyof typeof soulData];
+          soulData[loadout.secondarySoul as keyof typeof soulData];
 
         const allAvailableAbilities = [
           primarySoul.baseAttack,
@@ -369,10 +428,18 @@ export const submitTurn = mutation({
         ];
 
         const ability = allAvailableAbilities.find(
-          (a: any) => a.id === action.abilityId,
+          (a: any) =>
+            a.id === action.abilityId &&
+            (a.id === primarySoul.baseAttack.id ||
+              loadout.slots.some(
+                (s: any) => s.kind !== "passive" && s.abilityId === a.id,
+              )),
         );
 
-        if (!ability) throw new Error("Ability not found: " + action.abilityId);
+        if (!ability)
+          throw new Error(
+            "Ability not found or not in loadout: " + action.abilityId,
+          );
 
         if (
           simPa < ability.paCost ||
