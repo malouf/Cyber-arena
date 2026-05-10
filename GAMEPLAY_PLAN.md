@@ -59,10 +59,10 @@ Consumables placed on the grid that are consumed upon walking over them.
 
 ### 3. Implementation Checklist
 
-- [ ] Update `SoulId`, `Passive.effect`, and `InteractableType` in types.
-- [ ] Add Umbra, Verdant, and Volt data to `soulData`.
-- [ ] Implement item pickup logic in `engine.ts` and `gameEngine.ts`.
-- [ ] Add teleport and root mechanics to engines.
-- [ ] Integrate new Souls into AI draft logic.
+- [x] Update `SoulId`, `Passive.effect`, and `InteractableType` in types.
+- [x] Add Umbra, Verdant, and Volt data to `soulData`.
+- [x] Implement item pickup logic in `engine.ts` and `gameEngine.ts`.
+- [x] Add teleport and root mechanics to engines.
+- [x] Integrate new Souls into AI draft logic.
 
 By focusing on these features offline, we will stress-test the `engine.ts`. Once it flawlessly handles complex interactions (like an AI getting pushed into a trap that roots it), we will be 100% ready for multiplayer.
