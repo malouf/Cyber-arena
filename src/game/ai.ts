@@ -10,11 +10,18 @@ import type {
 } from "./types";
 
 export function generateEnemyBuild(): EntityState {
-  const soulIds: Array<SoulId> = ["onde", "fury", "aegis"];
-  const primaryId = soulIds[Math.floor(Math.random() * soulIds.length)];
-  const secondaryId = soulIds.filter((id) => id !== primaryId)[
-    Math.floor(Math.random() * 2)
+  const soulIds: Array<SoulId> = [
+    "onde",
+    "fury",
+    "aegis",
+    "umbra",
+    "verdant",
+    "volt",
   ];
+  const primaryId = soulIds[Math.floor(Math.random() * soulIds.length)];
+  const remainingIds = soulIds.filter((id) => id !== primaryId);
+  const secondaryId =
+    remainingIds[Math.floor(Math.random() * remainingIds.length)];
 
   const primarySoul = soulData[primaryId];
   const secondarySoul = soulData[secondaryId];

@@ -29,4 +29,40 @@ The aesthetic is minimalist (Black/White/Red), but it needs to feel visceral.
 - **Ghosting**: Show the projected path of a move or the AoE of a spell on the grid _before_ clicking.
 - **Glitch UI**: Introduce subtle CSS animations (screen tearing, noise) on the `ArenaHeader` when Ultimates are cast.
 
+## Phase 5: The Elemental Expansion
+
+Introduce three new Souls and an Item Pickup system to enrich tactical depth.
+
+### 1. New Souls
+
+- **Umbra (Assassin)**:
+  - Role: High mobility/damage, low health.
+  - Key Mechanics: Teleportation (_Blink_), Stealth (_Vanish_).
+  - Passive: _Opportunist_ (Extra damage vs low HP).
+- **Verdant (Control)**:
+  - Role: Zone control and sustain.
+  - Key Mechanics: Roots (_Entangle_), Obstacle creation (_Brier Wall_).
+  - Passive: _Root System_ (Heal when standing still).
+- **Volt (Mobility)**:
+  - Role: High speed and chain attacks.
+  - Key Mechanics: Chain damage (_Chain Lightning_), High PM (_Thunder Dash_).
+  - Passive: _Supercharged_ (Gain PM when using Mana).
+
+### 2. Item Pickup System
+
+Consumables placed on the grid that are consumed upon walking over them.
+
+- **Health Pack (`hp_pack`)**: Restores 20 HP.
+- **Mana Pack (`mana_pack`)**: Restores 2 Mana.
+- **Action Boost (`pa_boost`)**: Grants +1 PA for the next turn.
+- **Movement Boost (`pm_boost`)**: Grants +1 PM for the next turn.
+
+### 3. Implementation Checklist
+
+- [x] Update `SoulId`, `Passive.effect`, and `InteractableType` in types.
+- [x] Add Umbra, Verdant, and Volt data to `soulData`.
+- [x] Implement item pickup logic in `engine.ts` and `gameEngine.ts`.
+- [x] Add teleport and root mechanics to engines.
+- [x] Integrate new Souls into AI draft logic.
+
 By focusing on these features offline, we will stress-test the `engine.ts`. Once it flawlessly handles complex interactions (like an AI getting pushed into a trap that roots it), we will be 100% ready for multiplayer.

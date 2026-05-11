@@ -48,9 +48,19 @@ function processPassives(
   }
 
   // Offensive passives on actor
+  if (
+    actor.state.passives.includes("opportunist") &&
+    target.state.hp < target.state.maxHp / 2
+  ) {
+    finalDamage += 5;
+    events.push({
+      type: "log",
+      text: `Opportunist: +5 DMG!`,
+    });
+  }
+
   if (actor.state.passives.includes("momentum")) {
-    // This would require tracking distance moved this turn, simplified for now
-    // In a real implementation, you'd check actor.state.distanceMovedThisTurn
+    // tracking distance would be better but keeping it simple
   }
 
   return { damage: finalDamage, mitigation };
@@ -116,6 +126,13 @@ export function resolveMatchTurn(
       const totalCost = action.paCost + action.pmCost + action.manaCost * 2;
 
       if (action.type === "move") {
+        if (actor.state.effects.some((e: any) => e.type === "root")) {
+          events.push({
+            type: "log",
+            text: `${actor.name} is ROOTED and cannot move!`,
+          });
+          continue;
+        }
         const dist = getDistance(actor.state.pos, action.target);
         actor.state.pm -= action.pmCost;
         actor.state.pa -= action.paCost;
@@ -139,7 +156,7 @@ export function resolveMatchTurn(
         );
         if (pickup) {
           pickup.collected = true;
-          if (pickup.type === "hp") {
+          if (pickup.type === "hp" || pickup.type === "hp_pack") {
             const healAmount = Math.min(
               actor.state.maxHp - actor.state.hp,
               pickup.value,
@@ -156,7 +173,7 @@ export function resolveMatchTurn(
               type: "log",
               text: `${actor.name} picked up HP! (+${pickup.value})`,
             });
-          } else if (pickup.type === "mana") {
+          } else if (pickup.type === "mana" || pickup.type === "mana_pack") {
             actor.state.mana = Math.min(
               actor.state.maxMana,
               actor.state.mana + pickup.value,
@@ -171,6 +188,18 @@ export function resolveMatchTurn(
             events.push({
               type: "log",
               text: `${actor.name} picked up Mana! (+${pickup.value})`,
+            });
+          } else if (pickup.type === "pa_boost") {
+            actor.state.bonusPa = (actor.state.bonusPa || 0) + pickup.value;
+            events.push({
+              type: "log",
+              text: `${actor.name} picked up PA Boost! (+${pickup.value} next turn)`,
+            });
+          } else if (pickup.type === "pm_boost") {
+            actor.state.bonusPm = (actor.state.bonusPm || 0) + pickup.value;
+            events.push({
+              type: "log",
+              text: `${actor.name} picked up PM Boost! (+${pickup.value} next turn)`,
             });
           }
         }
@@ -265,7 +294,6 @@ export function resolveMatchTurn(
           // Handle self-buffs or ally buffs
           if (action.name === "Fortify") {
             const shieldAmount = 20;
-            // Simplified shielding logic: add to HP for now or track separately
             actor.state.hp = Math.min(
               actor.state.maxHp + shieldAmount,
               actor.state.hp + shieldAmount,
@@ -277,11 +305,41 @@ export function resolveMatchTurn(
               text: "SHIELDED",
               color: "text-blue-400",
             });
+          } else if (action.name === "Healing Bloom") {
+            const healAmount = 20;
+            const actualHeal = Math.min(
+              actor.state.maxHp - actor.state.hp,
+              healAmount,
+            );
+            actor.state.hp += actualHeal;
+            analytics[slot].healingDone += actualHeal;
+            events.push({
+              type: "healing",
+              entity: slot,
+              amount: actualHeal,
+              source: "Healing Bloom",
+            });
+          } else if (action.name === "Overload (Ult)") {
+            actor.state.bonusPa = (actor.state.bonusPa || 0) + 2;
+            actor.state.bonusPm = (actor.state.bonusPm || 0) + 2;
+            events.push({
+              type: "log",
+              text: `${actor.name} is OVERLOADED! (+2 PA/PM next turn)`,
+            });
           }
         } else if (abilityType === "control") {
-          if (targetPlayer) {
-            // Simplified Magnetic Pull: move target to actor's adjacent cell
-            // In a real implementation, you'd calculate the correct cell
+          if (action.name === "Blink") {
+            actor.state.pos = action.target;
+            events.push({
+              type: "move",
+              entity: slot,
+              pos: { ...actor.state.pos },
+            });
+            events.push({
+              type: "log",
+              text: `${actor.name} blinked to [${actor.state.pos.x}, ${actor.state.pos.y}]!`,
+            });
+          } else if (targetPlayer) {
             events.push({
               type: "log",
               text: `${actor.name} pulled ${targetPlayer.name}!`,
@@ -292,7 +350,6 @@ export function resolveMatchTurn(
             type: "log",
             text: `${actor.name} placed a ${action.name}!`,
           });
-          // Logic to add to currentMapObjects could go here
         }
 
         events.push({
@@ -309,9 +366,24 @@ export function resolveMatchTurn(
   // End of turn recovery
   currentPlayers.forEach((p: any) => {
     if (p.state.hp > 0) {
-      p.state.pa = p.state.maxPa;
-      p.state.pm = p.state.maxPm;
+      p.state.pa = p.state.maxPa + (p.state.bonusPa || 0);
+      p.state.pm = p.state.maxPm + (p.state.bonusPm || 0);
+      p.state.bonusPa = 0;
+      p.state.bonusPm = 0;
       p.state.mana = Math.min(p.state.maxMana, p.state.mana + 1);
+
+      // Passive: Root System
+      if (p.state.passives.includes("root_system")) {
+        // Simplified check: heal 5 if they have it
+        const heal = 5;
+        p.state.hp = Math.min(p.state.maxHp, p.state.hp + heal);
+        events.push({
+          type: "healing",
+          entity: p.slot,
+          amount: heal,
+          source: "Root System",
+        });
+      }
 
       events.push({
         type: "stats",
