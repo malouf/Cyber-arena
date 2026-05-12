@@ -159,10 +159,32 @@ export function useMatchSync(matchId: string | null, clientId: string | null) {
 
     // Detect new turn
     if (matchState.turnNumber !== lastSyncedTurn) {
-      // Use cumulative analytics from backend
-      const playerAn = matchState.analytics[matchState.yourSlot];
+      // Use cumulative analytics from backend with fallback for missing data
+      const playerAn = matchState.analytics[matchState.yourSlot] ?? {
+        damageDealt: 0,
+        damageTaken: 0,
+        healingDone: 0,
+        shieldingDone: 0,
+        damageMitigated: 0,
+        resourceEfficiency: 0,
+        interrupts: 0,
+        distanceMoved: 0,
+        actionsExecuted: 0,
+        abilityBreakdown: {},
+      };
       const enemyAn = matchState.enemySlot
-        ? matchState.analytics[matchState.enemySlot]
+        ? (matchState.analytics[matchState.enemySlot] ?? {
+            damageDealt: 0,
+            damageTaken: 0,
+            healingDone: 0,
+            shieldingDone: 0,
+            damageMitigated: 0,
+            resourceEfficiency: 0,
+            interrupts: 0,
+            distanceMoved: 0,
+            actionsExecuted: 0,
+            abilityBreakdown: {},
+          })
         : null;
 
       useGameStore.setState((s) => ({

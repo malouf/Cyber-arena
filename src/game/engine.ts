@@ -133,7 +133,9 @@ export function resolveTurn(
     attacker: "player" | "enemy" = "enemy",
   ) => {
     const stats = target === "player" ? pStats : eStats;
-    let finalDamage = amount;
+    // Apply RNG: ±10% variance to damage
+    const rngFactor = 0.9 + Math.random() * 0.2;
+    let finalDamage = Math.round(amount * rngFactor);
 
     // Passive: Opportunist
     if (attacker === "player" && pStats.passives.includes("opportunist")) {

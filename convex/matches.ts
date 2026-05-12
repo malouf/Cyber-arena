@@ -69,6 +69,19 @@ export const queueForMatch = mutation({
     matchId: v.union(v.id("matches"), v.null()),
   }),
   handler: async (ctx: any, args: any) => {
+    // Validate loadout: must have exactly 4 actives and 2 passives
+    const activeCount = args.slots.filter(
+      (s: any) => s.kind === "active",
+    ).length;
+    const passiveCount = args.slots.filter(
+      (s: any) => s.kind === "passive",
+    ).length;
+    if (activeCount !== 4 || passiveCount !== 2) {
+      throw new Error(
+        `Invalid loadout: must have exactly 4 actives and 2 passives. Got ${activeCount} actives and ${passiveCount} passives.`,
+      );
+    }
+
     // Join queue
     await ctx.db.insert("matchmakingQueue", {
       clientId: args.clientId,

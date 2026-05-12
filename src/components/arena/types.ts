@@ -30,6 +30,7 @@ export type GameServerState = {
   persistentBuffs: {
     flowStateRange: number;
     bonusPa: number;
+    bonusPm: number;
   };
   interactables: Array<Interactable>;
   turnNumber: number;

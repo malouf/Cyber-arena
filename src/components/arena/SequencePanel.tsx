@@ -37,6 +37,7 @@ export function SequencePanel() {
       usesThisTurn: { ...usesThisTurn },
       flowStateRange: persistentBuffs.flowStateRange,
       bonusPa: persistentBuffs.bonusPa,
+      bonusPm: persistentBuffs.bonusPm,
       isRestTurn: skipRequested,
     });
   };

@@ -3,6 +3,9 @@ import { Link } from "@tanstack/react-router";
 import { soulData } from "../../game/data";
 import type { LoadoutSlot, Soul, SoulId } from "../../game/types";
 
+const MAX_ACTIVE = 4;
+const MAX_PASSIVE = 2;
+
 export type PlayerBuild = {
   primary: SoulId;
   secondary: SoulId;
@@ -19,22 +22,39 @@ export function DraftPhase({ onComplete }: Props) {
   );
   const [primarySoul, setPrimarySoul] = useState<SoulId | null>(null);
   const [secondarySoul, setSecondarySoul] = useState<SoulId | null>(null);
+  const [highlightedSoul, setHighlightedSoul] = useState<SoulId | null>(null);
 
-  // Loadout selection: 8 slots
-  // Slot 0: Elite (Primary's Ultimate) - auto-selected
-  // Slots 1-7: 7 selectable abilities/passives from both souls
+  // Loadout selection: 1 Elite + 4 Actives + 2 Passives = 7 total slots
   const [selectedLoadout, setSelectedLoadout] = useState<Array<string>>([]);
 
   const handleSelectPrimary = (id: SoulId) => {
-    setPrimarySoul(id);
-    setPhase("secondary");
+    setHighlightedSoul(id);
+  };
+
+  const confirmPrimary = () => {
+    if (highlightedSoul) {
+      setPrimarySoul(highlightedSoul);
+      setHighlightedSoul(null);
+      setPhase("secondary");
+    }
   };
 
   const handleSelectSecondary = (id: SoulId) => {
-    // Cannot be the same as primary
     if (id === primarySoul) return;
-    setSecondarySoul(id);
-    setPhase("loadout");
+    setHighlightedSoul(id);
+  };
+
+  const confirmSecondary = () => {
+    if (highlightedSoul) {
+      setSecondarySoul(highlightedSoul);
+      setHighlightedSoul(null);
+      setPhase("loadout");
+    }
+  };
+
+  const goBackToPrimary = () => {
+    setPhase("primary");
+    setHighlightedSoul(primarySoul);
   };
 
   // Get available abilities and passives from both souls
@@ -71,18 +91,47 @@ export function DraftPhase({ onComplete }: Props) {
     return slots;
   }, [primarySoul, secondarySoul]);
 
-  const toggleSlot = (slotId: string) => {
+  const toggleSlot = (slotId: string, slotKind: "active" | "passive") => {
     if (selectedLoadout.includes(slotId)) {
       setSelectedLoadout((prev) => prev.filter((x) => x !== slotId));
-    } else if (selectedLoadout.length < 7) {
-      // 7 selectable slots (slot 0 is elite)
-      setSelectedLoadout((prev) => [...prev, slotId]);
+    } else {
+      // Count current selections by type
+      const currentActives = availableSlots.filter(
+        (s) => s.kind === "active" && selectedLoadout.includes(s.ability.id),
+      ).length;
+      const currentPassives = availableSlots.filter(
+        (s) => s.kind === "passive" && selectedLoadout.includes(s.passive.id),
+      ).length;
+
+      if (slotKind === "active" && currentActives >= MAX_ACTIVE) {
+        return; // Max actives reached
+      }
+      if (slotKind === "passive" && currentPassives >= MAX_PASSIVE) {
+        return; // Max passives reached
+      }
+
+      // Elite slots (ultimate) are auto-included and not in selectedLoadout
+      const totalSelectable = selectedLoadout.length;
+      const maxSelectable = MAX_ACTIVE + MAX_PASSIVE; // 4 actives + 2 passives
+
+      if (totalSelectable < maxSelectable) {
+        setSelectedLoadout((prev) => [...prev, slotId]);
+      }
     }
   };
 
   const finalizeDraft = () => {
     if (!primarySoul || !secondarySoul) return;
-    if (selectedLoadout.length !== 7) return;
+    // Validate: must have exactly 4 actives and 2 passives selected
+    const selectedActives = availableSlots.filter(
+      (s) => s.kind === "active" && selectedLoadout.includes(s.ability.id),
+    ).length;
+    const selectedPassives = availableSlots.filter(
+      (s) => s.kind === "passive" && selectedLoadout.includes(s.passive.id),
+    ).length;
+    if (selectedActives !== MAX_ACTIVE || selectedPassives !== MAX_PASSIVE) {
+      return;
+    }
 
     // Build the loadout array
     const loadout: Array<LoadoutSlot> = [];
@@ -108,11 +157,23 @@ export function DraftPhase({ onComplete }: Props) {
     });
   };
 
+  const selectedActivesCount = availableSlots.filter(
+    (s) => s.kind === "active" && selectedLoadout.includes(s.ability.id),
+  ).length;
+  const selectedPassivesCount = availableSlots.filter(
+    (s) => s.kind === "passive" && selectedLoadout.includes(s.passive.id),
+  ).length;
   const canDeploy =
-    primarySoul && secondarySoul && selectedLoadout.length === 7;
+    primarySoul &&
+    secondarySoul &&
+    selectedActivesCount === MAX_ACTIVE &&
+    selectedPassivesCount === MAX_PASSIVE;
 
   if (phase === "primary" || phase === "secondary") {
     const isPrimary = phase === "primary";
+    const confirmAction = isPrimary ? confirmPrimary : confirmSecondary;
+    const canConfirm = highlightedSoul !== null;
+
     return (
       <main className="min-h-screen bg-black text-neutral-100 flex flex-col items-center justify-center p-6 font-sans">
         <div className="max-w-5xl w-full">
@@ -126,7 +187,7 @@ export function DraftPhase({ onComplete }: Props) {
               </Link>
             ) : (
               <button
-                onClick={() => setPhase("primary")}
+                onClick={goBackToPrimary}
                 className="text-neutral-500 hover:text-white transition-colors uppercase font-bold text-xs tracking-[0.2em] mb-8 inline-block"
               >
                 ← Back to Primary
@@ -140,12 +201,19 @@ export function DraftPhase({ onComplete }: Props) {
                 ? "Determines Base Stats & Ultimate"
                 : "Expands Skill Tree Options"}
             </p>
+            {highlightedSoul && (
+              <p className="text-neutral-400 text-sm mt-2">
+                {soulData[highlightedSoul].name} selected — click Confirm to
+                proceed
+              </p>
+            )}
           </header>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {(Object.entries(soulData) as Array<[SoulId, Soul]>).map(
               ([id, soul]) => {
                 const disabled = !isPrimary && id === primarySoul;
+                const isHighlighted = highlightedSoul === id;
                 return (
                   <button
                     key={id}
@@ -157,9 +225,13 @@ export function DraftPhase({ onComplete }: Props) {
                     }
                     className={`p-8 border bg-black group transition-all text-left relative overflow-hidden
                     ${disabled ? "border-neutral-900 opacity-30 cursor-not-allowed" : "border-neutral-800 hover:border-red-600 cursor-pointer"}
+                    ${isHighlighted ? "border-red-600 bg-red-900/10" : ""}
                   `}
                   >
-                    {!disabled && (
+                    {isHighlighted && (
+                      <div className="absolute top-0 left-0 w-1 h-full bg-red-600" />
+                    )}
+                    {!disabled && !isHighlighted && (
                       <div className="absolute inset-0 bg-red-600/5 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-500" />
                     )}
                     <h3 className="text-3xl font-black uppercase tracking-tighter text-white relative z-10">
@@ -196,6 +268,18 @@ export function DraftPhase({ onComplete }: Props) {
               },
             )}
           </div>
+
+          <div className="mt-12 flex justify-center">
+            <button
+              disabled={!canConfirm}
+              onClick={confirmAction}
+              className={`px-12 py-4 text-sm font-black uppercase tracking-[0.3em] transition-all
+                ${canConfirm ? "bg-white text-black hover:bg-red-600 hover:text-white" : "bg-neutral-900 text-neutral-600 cursor-not-allowed"}
+              `}
+            >
+              Confirm {isPrimary ? "Primary" : "Secondary"} Soul
+            </button>
+          </div>
         </div>
       </main>
     );
@@ -227,7 +311,7 @@ export function DraftPhase({ onComplete }: Props) {
               Configure Loadout
             </h1>
             <p className="text-xs text-neutral-600 mt-1">
-              8 Slots: 1 Elite (auto) + 7 Selectable
+              1 Elite (auto) + {MAX_ACTIVE} Actives + {MAX_PASSIVE} Passives
             </p>
           </div>
           <button
@@ -236,7 +320,8 @@ export function DraftPhase({ onComplete }: Props) {
             className={`px-8 py-3 text-xs font-black uppercase tracking-[0.2em] transition-colors
               ${canDeploy ? "bg-white text-black hover:bg-red-600 hover:text-white" : "bg-neutral-900 text-neutral-600 cursor-not-allowed"}`}
           >
-            Deploy ({selectedLoadout.length}/7)
+            Deploy ({selectedActivesCount}/{MAX_ACTIVE} Actives,{" "}
+            {selectedPassivesCount}/{MAX_PASSIVE} Passives)
           </button>
         </header>
 
@@ -313,19 +398,15 @@ export function DraftPhase({ onComplete }: Props) {
                   Active Abilities
                 </h2>
                 <span className="text-[10px] font-mono text-neutral-500">
-                  {
-                    activeSlots.filter((s) =>
-                      selectedLoadout.includes(s.ability.id),
-                    ).length
-                  }{" "}
-                  / 4 Selected
+                  {selectedActivesCount} / {MAX_ACTIVE} Selected
                 </span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {activeSlots.map((slot) => {
                   const ability = slot.ability;
                   const isSelected = selectedLoadout.includes(ability.id);
-                  const isDisabled = !isSelected && selectedLoadout.length >= 7;
+                  const atMaxActives = selectedActivesCount >= MAX_ACTIVE;
+                  const isDisabled = !isSelected && atMaxActives;
                   const isPrimaryAbility =
                     pSoul.actives.some((a) => a.id === ability.id) ||
                     ability.id === pSoul.baseAttack.id;
@@ -335,7 +416,7 @@ export function DraftPhase({ onComplete }: Props) {
                     <button
                       key={ability.id}
                       disabled={isDisabled}
-                      onClick={() => toggleSlot(ability.id)}
+                      onClick={() => toggleSlot(ability.id, "active")}
                       className={`p-4 border text-left transition-all relative
                         ${isSelected ? "border-white bg-neutral-900" : "border-neutral-800 bg-black hover:border-neutral-600"}
                         ${isDisabled ? "opacity-30 cursor-not-allowed" : ""}
@@ -389,19 +470,15 @@ export function DraftPhase({ onComplete }: Props) {
                   Passive Synergies
                 </h2>
                 <span className="text-[10px] font-mono text-neutral-500">
-                  {
-                    passiveSlots.filter((s) =>
-                      selectedLoadout.includes(s.passive.id),
-                    ).length
-                  }{" "}
-                  / 3 Selected
+                  {selectedPassivesCount} / {MAX_PASSIVE} Selected
                 </span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {passiveSlots.map((slot) => {
                   const passive = slot.passive;
                   const isSelected = selectedLoadout.includes(passive.id);
-                  const isDisabled = !isSelected && selectedLoadout.length >= 7;
+                  const atMaxPassives = selectedPassivesCount >= MAX_PASSIVE;
+                  const isDisabled = !isSelected && atMaxPassives;
                   const isPrimaryPassive = pSoul.passives.some(
                     (p) => p.id === passive.id,
                   );
@@ -410,7 +487,7 @@ export function DraftPhase({ onComplete }: Props) {
                     <button
                       key={passive.id}
                       disabled={isDisabled}
-                      onClick={() => toggleSlot(passive.id)}
+                      onClick={() => toggleSlot(passive.id, "passive")}
                       className={`p-4 border text-left transition-all relative
                         ${isSelected ? "border-red-600 bg-red-900/10" : "border-neutral-800 bg-black hover:border-neutral-600"}
                         ${isDisabled ? "opacity-30 cursor-not-allowed" : ""}
@@ -439,8 +516,8 @@ export function DraftPhase({ onComplete }: Props) {
               <h2 className="text-sm font-bold text-white uppercase tracking-[0.2em] mb-4">
                 Current Loadout Preview
               </h2>
-              <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
-                {/* Slot 0: Elite */}
+              <div className="grid grid-cols-7 gap-2">
+                {/* Slot 0: Elite (auto) */}
                 <div className="p-2 border border-red-900/50 bg-red-900/10 text-center">
                   <div className="text-[8px] text-red-500 uppercase mb-1">
                     Elite
@@ -449,8 +526,8 @@ export function DraftPhase({ onComplete }: Props) {
                     {eliteSlot.ability.name}
                   </div>
                 </div>
-                {/* Slots 1-7: Selected */}
-                {Array.from({ length: 7 }, (_, i) => {
+                {/* Slots 1-6: 4 Actives + 2 Passives */}
+                {Array.from({ length: 6 }, (_, i) => {
                   const selectedSlot = selectedLoadout[i];
                   let slotInfo = null;
 
@@ -479,7 +556,9 @@ export function DraftPhase({ onComplete }: Props) {
                       }`}
                     >
                       <div className="text-[8px] text-neutral-600 uppercase mb-1">
-                        {i + 1}
+                        {i < MAX_ACTIVE
+                          ? `Act ${i + 1}`
+                          : `Pass ${i - MAX_ACTIVE + 1}`}
                       </div>
                       <div className="text-[9px] font-bold text-neutral-500 truncate">
                         {slotInfo

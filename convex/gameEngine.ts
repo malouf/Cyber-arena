@@ -12,6 +12,11 @@ export function getDistance(c1: Pos, c2: Pos) {
   return Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dx + dy));
 }
 
+function applyRng(damage: number): number {
+  const rngFactor = 0.9 + Math.random() * 0.2;
+  return Math.round(damage * rngFactor);
+}
+
 function processPassives(
   actor: any,
   target: any,
@@ -234,11 +239,13 @@ export function resolveMatchTurn(
           const hit = dist <= action.range && targetPlayer !== undefined;
 
           if (hit && targetPlayer) {
+            // Apply RNG to damage before processing passives
+            const rngDamage = applyRng(action.damage);
             const { damage, mitigation } = processPassives(
               actor,
               targetPlayer,
               action,
-              action.damage,
+              rngDamage,
               events,
             );
 
