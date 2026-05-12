@@ -99,7 +99,7 @@ export const useGameStore = create<GameStore>()(
       actionQueue: [],
       cooldowns: {},
       usesThisTurn: {},
-      persistentBuffs: { flowStateRange: 0, bonusPa: 0 },
+      persistentBuffs: { flowStateRange: 0, bonusPa: 0, bonusPm: 0 },
       interactables: [],
       turnNumber: 0,
       skipRequested: false,
@@ -132,7 +132,11 @@ export const useGameStore = create<GameStore>()(
         state.server.actionQueue = [];
         state.server.cooldowns = {};
         state.server.usesThisTurn = {};
-        state.server.persistentBuffs = { flowStateRange: 0, bonusPa: 0 };
+        state.server.persistentBuffs = {
+          flowStateRange: 0,
+          bonusPa: 0,
+          bonusPm: 0,
+        };
         state.server.interactables = [...initialInteractables];
         state.server.turnNumber = 0;
         state.server.skipRequested = false;
@@ -380,6 +384,7 @@ export const useGameStore = create<GameStore>()(
         state.server.persistentBuffs = {
           flowStateRange: nextTurnState.flowStateRange,
           bonusPa: nextTurnState.bonusPa,
+          bonusPm: nextTurnState.bonusPm,
         };
         state.server.turnNumber += 1;
         state.server.skipRequested = false;

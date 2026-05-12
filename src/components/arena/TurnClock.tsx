@@ -40,6 +40,7 @@ export function TurnClock() {
         usesThisTurn: { ...usesThisTurn },
         flowStateRange: persistentBuffs.flowStateRange,
         bonusPa: persistentBuffs.bonusPa,
+        bonusPm: persistentBuffs.bonusPm,
         isRestTurn: true,
       });
     } else if (
@@ -62,6 +63,7 @@ export function TurnClock() {
         usesThisTurn: { ...usesThisTurn },
         flowStateRange: persistentBuffs.flowStateRange,
         bonusPa: persistentBuffs.bonusPa,
+        bonusPm: persistentBuffs.bonusPm,
         isRestTurn: true,
       });
     }
