@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "../../../convex/_generated/api";
 import { useMultiplayerStore } from "./multiplayerStore";
@@ -48,11 +48,9 @@ export function MultiplayerArena({ onExit }: Props) {
   }, [clientId, matchId, setMatchContext]);
 
   // Query lobby state to detect match
-  const lobbyStateResult = useQuery({
-    ...convexQuery(api.matches.getLobbyState, { clientId: clientId ?? "" }),
-    enabled: !!clientId,
-  });
-  const lobbyState = lobbyStateResult.data as MatchmakingState | undefined;
+  const { data: lobbyState } = useSuspenseQuery(
+    convexQuery(api.matches.getLobbyState, { clientId: clientId ?? "" }),
+  );
 
   // Watch for match found
   useEffect(() => {

@@ -1,3 +1,4 @@
+import { initialCombatStats } from "../../game/analytics";
 import { useGameStore } from "./gameStore";
 import { selectCombatStats, selectEnemyCombatStats } from "./selectors";
 import type { CombatStats } from "../../game/types";

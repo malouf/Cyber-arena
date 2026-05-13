@@ -6,11 +6,15 @@ import { ConvexProvider } from "convex/react";
 import { routeTree } from "./routeTree.gen";
 
 export function getRouter() {
-  const CONVEX_URL = (import.meta as any).env.VITE_CONVEX_URL!;
+  const CONVEX_URL = (import.meta as any).env.VITE_CONVEX_URL;
   if (!CONVEX_URL) {
-    console.error("missing envar CONVEX_URL");
+    console.error(
+      "Missing VITE_CONVEX_URL environment variable. Convex features will not work.",
+    );
   }
-  const convexQueryClient = new ConvexQueryClient(CONVEX_URL);
+  const convexQueryClient = new ConvexQueryClient(
+    CONVEX_URL ?? "http://localhost:3000",
+  );
 
   const queryClient: QueryClient = new QueryClient({
     defaultOptions: {

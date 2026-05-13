@@ -125,8 +125,10 @@ export const mapObjectValidator = v.object({
     v.literal("hp"),
     v.literal("mana"),
     v.literal("buff"),
+    v.literal("wall"),
   ),
   pos: posValidator,
   value: v.number(),
   collected: v.boolean(),
+  duration: v.optional(v.number()),
 });
