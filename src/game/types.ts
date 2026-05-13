@@ -95,6 +95,7 @@ export type EntityState = {
   passives: Array<string>;
   loadout: Array<LoadoutSlot>;
   effects: Array<StatusEffect>;
+  primarySoulId?: SoulId;
 };
 
 export type InteractableType =

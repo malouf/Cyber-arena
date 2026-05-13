@@ -36,6 +36,7 @@ export function DraftPhase({ onComplete }: Props) {
       setPrimarySoul(highlightedSoul);
       setHighlightedSoul(null);
       setPhase("secondary");
+      setSelectedLoadout([]); // Reset loadout when switching souls
     }
   };
 
@@ -49,6 +50,7 @@ export function DraftPhase({ onComplete }: Props) {
       setSecondarySoul(highlightedSoul);
       setHighlightedSoul(null);
       setPhase("loadout");
+      setSelectedLoadout([]); // Reset loadout when switching souls
     }
   };
 

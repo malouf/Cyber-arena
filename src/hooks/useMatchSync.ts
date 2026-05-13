@@ -1,5 +1,6 @@
 import { useCallback, useEffect } from "react";
-import { useQuery } from "convex/react";
+import { useQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "../../convex/_generated/api";
 import { useGameStore } from "../components/arena/gameStore";
 import { useMultiplayerStore } from "../components/arena/multiplayerStore";
@@ -97,18 +98,23 @@ function loadoutFromServer(
 
 export function useMatchSync(matchId: string | null, clientId: string | null) {
   const initializeGame = useGameStore((s) => s.initializeGame);
+  const syncState = useGameStore((s) => s.syncState);
   const clearQueue = useGameStore((s) => s.clearQueue);
   const setPendingSubmit = useMultiplayerStore((s) => s.setPendingSubmit);
   const setLastSyncedTurn = useMultiplayerStore((s) => s.setLastSyncedTurn);
   const lastSyncedTurn = useMultiplayerStore((s) => s.lastSyncedTurn);
 
-  const matchState = useQuery(
-    api.matches.getMatchState,
-    matchId && clientId ? { matchId, clientId } : "skip",
-  ) as ServerMatchState | undefined;
+  const matchStateResult = useQuery({
+    ...convexQuery(api.matches.getMatchState, {
+      matchId: (matchId as any) || "",
+      clientId: clientId || "",
+    }),
+    enabled: !!matchId && !!clientId,
+  });
+  const matchState = matchStateResult.data as ServerMatchState | undefined;
 
   const syncToStore = useCallback(
-    (state: ServerMatchState) => {
+    (state: ServerMatchState, forceInitialize: boolean = false) => {
       // Convert server loadout format to local format
       const playerLoadout = loadoutFromServer(state.playerState.loadout);
       const enemyLoadout = loadoutFromServer(state.enemyState.loadout);
@@ -146,19 +152,25 @@ export function useMatchSync(matchId: string | null, clientId: string | null) {
         effects: state.enemyState.effects,
       };
 
-      initializeGame(playerEntity, enemyEntity);
+      if (forceInitialize) {
+        initializeGame(playerEntity, enemyEntity);
+      } else {
+        syncState(playerEntity, enemyEntity, state.turnNumber);
+      }
     },
-    [initializeGame],
+    [initializeGame, syncState],
   );
 
   useEffect(() => {
     if (!matchState) return;
 
-    // Sync state to local store
-    syncToStore(matchState);
-
     // Detect new turn
-    if (matchState.turnNumber !== lastSyncedTurn) {
+    const isNewTurn = matchState.turnNumber !== lastSyncedTurn;
+
+    // Sync state to local store
+    syncToStore(matchState, isNewTurn);
+
+    if (isNewTurn) {
       // Use cumulative analytics from backend with fallback for missing data
       const playerAn = matchState.analytics[matchState.yourSlot] ?? {
         damageDealt: 0,

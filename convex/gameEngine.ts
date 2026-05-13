@@ -138,6 +138,26 @@ export function resolveMatchTurn(
           });
           continue;
         }
+
+        const isObstacle = _obstacles.some(
+          (o) => o.x === action.target.x && o.y === action.target.y,
+        );
+        const isWall = currentMapObjects.some(
+          (o: any) =>
+            o.type === "wall" &&
+            !o.collected &&
+            o.pos.x === action.target.x &&
+            o.pos.y === action.target.y,
+        );
+
+        if (isObstacle || isWall) {
+          events.push({
+            type: "log",
+            text: `${actor.name} movement blocked at [${action.target.x}, ${action.target.y}]!`,
+          });
+          continue;
+        }
+
         const dist = getDistance(actor.state.pos, action.target);
         actor.state.pm -= action.pmCost;
         actor.state.pa -= action.paCost;
@@ -355,7 +375,14 @@ export function resolveMatchTurn(
         } else if (abilityType === "trap") {
           events.push({
             type: "log",
-            text: `${actor.name} placed a ${action.name}!`,
+            text: `${actor.name} placed a ${action.name} at [${action.target.x}, ${action.target.y}]!`,
+          });
+          currentMapObjects.push({
+            type: "wall",
+            pos: action.target,
+            value: 0,
+            collected: false,
+            duration: 2,
           });
         }
 
@@ -402,9 +429,18 @@ export function resolveMatchTurn(
     }
   });
 
+  const nextMapObjects = currentMapObjects
+    .map((obj: any) => {
+      if (obj.duration !== undefined) {
+        return { ...obj, duration: obj.duration - 1 };
+      }
+      return obj;
+    })
+    .filter((obj: any) => obj.duration === undefined || obj.duration > 0);
+
   return {
     nextPlayers: currentPlayers,
-    nextMapObjects: currentMapObjects,
+    nextMapObjects,
     events,
     analytics,
   };

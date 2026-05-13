@@ -29,6 +29,11 @@ type GameStore = GameState & {
     enemy: EntityState,
     initialLogs?: Array<string>,
   ) => void;
+  syncState: (
+    player: EntityState,
+    enemy: EntityState,
+    turnNumber: number,
+  ) => void;
   setActiveCommand: (command: ActiveCommand) => void;
   setHoveredCell: (cell: { x: number; y: number } | null) => void;
   handleCellClick: (
@@ -148,6 +153,21 @@ export const useGameStore = create<GameStore>()(
         state.ui.logs = initialLogs ?? [
           "System online. Select a command to begin sequence.",
         ];
+      }),
+
+    syncState: (player, enemy, turnNumber) =>
+      set((state) => {
+        state.server.player = {
+          ...player,
+          loadout: player.loadout,
+          effects: player.effects,
+        };
+        state.server.enemy = {
+          ...enemy,
+          loadout: enemy.loadout,
+          effects: enemy.effects,
+        };
+        state.server.turnNumber = turnNumber;
       }),
 
     setActiveCommand: (command) =>

@@ -70,6 +70,7 @@ export function generateEnemyBuild(): EntityState {
       .filter((e) => !!e) as Array<string>,
     loadout,
     effects: [],
+    primarySoulId: primaryId,
   };
 }
 
@@ -154,8 +155,13 @@ export function selectEnemyActions(
     .map((slot) => (slot as any).ability as Ability);
 
   // Add basic attack
-  const soul = soulData["fury"]; // fallback or default
-  abilities.push(soul.baseAttack);
+  if (eState.primarySoulId) {
+    const soul = soulData[eState.primarySoulId];
+    abilities.push(soul.baseAttack);
+  } else {
+    const soul = soulData["fury"]; // fallback
+    abilities.push(soul.baseAttack);
+  }
 
   // Try to use the best possible ability
   // Sort by damage desc

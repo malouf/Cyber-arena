@@ -9,7 +9,11 @@ type Props = {
   onCellClick?: (cell: { x: number; y: number }) => void;
 };
 
-export function GridRenderer({ buildPassives, interactables = [], onCellClick }: Props) {
+export function GridRenderer({
+  buildPassives,
+  interactables = [],
+  onCellClick,
+}: Props) {
   const playerPos = useGameStore((s) => s.server.player.pos);
   const enemyPos = useGameStore((s) => s.server.enemy.pos);
 
@@ -64,9 +68,9 @@ export function GridRenderer({ buildPassives, interactables = [], onCellClick }:
         {rows.map((y) => (
           <div
             key={y}
-            className="flex gap-1 justify-center relative"
+            className="flex gap-1 relative"
             style={{
-              transform: `translateX(${y % 2 !== 0 ? "2.2%" : "-2.2%"})`,
+              marginLeft: `calc(${y} * clamp(2rem, 4.5vw, 4rem) / 2)`,
             }}
           >
             {cols.map((x) => {
